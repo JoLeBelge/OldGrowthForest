@@ -1,0 +1,12 @@
+Quelques adaptations méthodologique ont eu lieu durant la campagne d'inventaire
+
+-Le premier jour, la position de tous les arbres mesurés a été relevée au moyen de la distance et de l'azimut au centre de UE.
+
+Par après, un GPS de précision a permis de relevé la position uniquement du centre de placette, des arbres de plus de 240 cm de tour ou des 3 arbres dominants dans la placette de 30 mètres si aucun arbre de plus de 240 n'est présent. L'objectif est de disposer de données spatialisées pour valider ou pour entrainer des algos de segmentations sur les données LiDAR.
+
+-Le premier jour, les arbres entre 40 et 120 de circonférence ont été mesuré dans le rayon de 9m (A3). Ensuite, ceux-ci sont comptés sans distinction des essences et avec estimation de leur grosseurs en 3 classes : 20-40 cm, 40-80 et 80-120. C'est dans la table cohorte_arbre.
+
+-Jusque début décembre, la hauteur de tout les arbres morts sur pied était estimée. Ensuite, on a compris notre erreur et on a estimé la hauteur uniquement pour les chandelles, tandis que les arbres morts sur pied ayant leur houppier se voient attribuer un facteur de crownVolumeReduction
+
+-Jusque début décembre, les transects pour l'inventaire du bois mort au sol entre 30 et 90 de tour étaient de 15 mètres. Nous les avons par la suite réalisé sur 27 mètres, de manière à parcourir l'ensemble de la placette A5 de 30 mètres de rayon.
+
