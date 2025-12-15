@@ -1,0 +1,49 @@
+TABLE arbre
+-----------
+
+
+ues_id_ogf 		-> identifiant du peuplement subnaturel mature (Old Growth Forest)
+ues_id_ue 		-> identifiant de la placette d'inventaire (plot - UE - Unité d'échantillonage)
+X_arbre_position	-> identifiant de l'arbre (numéro attribué automatiquement par Open Foris Collect)
+ess			-> essence de l'arbre (voir table essence_list)
+statut			-> statut, vivant (1) ou mort sur pied (2)
+circ            	-> circonférence à 130 cm de hauteur, mesuré au mètre ruban
+h			-> hauteur de la chandelle, estimé à l'oeil par un personnel entrainé.
+decomposition		-> voir table decompo_list et methodo Vandekerkhove 2024
+vitalite		-> voir table vitalite_list et methodo Vandekerkhove 2024
+rmq			-> diverses remarques
+dist			-> pour la première journée d'inventaire UNIQUEMENT, on a relevé les distances au vertex
+azimut          	-> pour la première journée d'inventaire UNIQUEMENT, on a relevé les distances au compas
+cvr			-> crown volume reduction, voir methodo Vandekerkhove 2024
+a5			-> Placette concentrique A5 = 30 mètres de rayon. A4 = 18 mètres de rayon. Pour la description dendrométrique, les arbres de moins de 240 de circonférence sont relevés dans A4 et pas dans A5. Mais pour les besoin de comparaison des données terrain avec les données de télédétection, les 3 arbres dominants dans la placette sont relevés et leur position et enregistré avec un récepteur précis et avec correction (RTK mode). Si les dominants font moins de 240 cm de circ sont dans A5, on décoche cette colonne pour ne pas utiliser ces arbres dans les calculs dendrométriques
+A5bool			-> conversion de la colonne a5 du formulaire "open foris collect" vers le type boolean
+v			-> volume
+v_branches		-> volume des branches jusqu'à la recoupe de 22 cm de circonférence
+v_tc1           	-> volume tarif de cubage à une entrée
+fe   			-> facteur d'extension de l'arbre
+
+
+TABLE dendro
+------------
+
+Les résultats dendrométrique par UE/plot
+
+ues_id_ogf,ues_id_ue -> voir ci-dessus
+
+number_of_trees_thres120 	-> nha (-/ha) pour les arbres vivants de plus de 120 de tour (plot A4 et A5)
+vol_alive_thres120 		-> volume (m3/ha) des troncs et des branches pour les arbres vivants de plus de 120 de tour (plot A4 et A5)
+basal_area_alive_thres120
+number_of_trees_co 		-> nha (-/ha) pour les arbres vivants entre 40 et 120 de circonférence. Ces arbres sont mesurés dans la placette A3 de 9 mètre de rayon et sont compté et regroupé en 3 catégorie de grosseur : 20-40 cm, 40-80 cm et 80-120 cm. voir cohorte_list
+vol_alive_co
+basal_area_alive_co
+vol_dead_standing 		-> volume (m3/ha) des chandelles et des bois mort sur pied (tronc + volume de houppier * crown volume reduction)
+basal_area_dead
+essmaj 			-> les deux essences majoritaires en surface terrière 
+vol_log_FAS			-> volume des buches de plus de 90 cm de circonférence au gros bout, mesuré par FAS (full area sampling) sur la placette A4 (18 mètres de rayon
+vol_log_LIS			-> volume des buches de plus de 30 cm de circonférence et de moins de 90 cm de circonférence, mesuré par LIS (line intersect sampling)
+number_of_trees
+vol_alive
+vol_deadw			-> volume of dead wood = vol_dead_standing + vol_log_FAS + vol_log_LIS
+basal_area_alive
+cdom				-> circonférence dominante, les 5 plus gros bois de la placette A5 (=les 15 plus gros arbres à l'hectare)
+pct_vol_dead_standing   
