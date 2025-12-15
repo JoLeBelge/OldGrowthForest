@@ -122,10 +122,15 @@ if (arbre$statut[i]==1){
   if (!is.na(arbre$h[i])){
   if (arbre$h[i]>15){
   arbre$v_tc1[i] <- tc( arbre$circ[i],dico_ess_cub$numtarif[dico_ess_cub$abreviation == arbre$ess[i]]) 
+  # at the beginning of the survey we have not measured the crown volume reduction and we have estimated a tree height even for dead tree that still have a crown. I have to deal with that
+  if (is.na(arbre$cvr[i])){
+  arbre$v_branches[i] <- 0
+  }
   
   } else {
-    # cylindre : pi r2 * h
-      arbre$v[i] <- ((arbre$circ[i]/100)^2)/(4*pi) * arbre$h[i]
+    # cylindre : pi r2 * h. Je devrais plutôt utiliser un défilement car un gros bois de 300 de tour ça ne fait pas un cylindre de 15 mètres de hauteur..
+    # tree taper equation  
+     arbre$v[i] <- ((arbre$circ[i]/100)^2)/(4*pi) * arbre$h[i]
       arbre$v_branches[i] <-0
   }
   } else {
@@ -137,6 +142,7 @@ if (arbre$statut[i]==1){
   if (!is.na(arbre$cvr[i]) & arbre$cvr[i]>0){
   arbre$v_branches[i] <- arbre$v_branches[i]*(1-arbre$cvr[i]/100)
   }
+  
 }
 }
 
