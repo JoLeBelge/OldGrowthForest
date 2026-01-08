@@ -1,0 +1,52 @@
+Worflow pré-cartographie des OGF, 2025 10 24 , par JL
+Objectif ; tester les seuils dendro et la sélection de la zone d'intérêt - montrer ce qu'on peut faire avec la dernière version des utilitaire de gdal
+
+-------
+
+On va préparer l'ensemble des données utilisées en entrée : mettre tout au format raster, avec la même résolution et le même extent. Vu que cette étape est réalisée une seule fois, je la réalise avec l'exécutable gdal (dernière version) en ligne de commande.
+
+Je constate que les couches dendro sur forestimator ne sont pas exactement à la même résolution que la couche de composition. La résolution est de 2.5 m, c'est un peu trop résolu pour notre recherche et ça risque de rendre tout les traitement assez lent. Je passe tout à 10 mètre de résolution, soit un total de 16 x moins de pixels.
+Attention au resample ; si variable continue, c'est facile. Si Variable de classes/catégorie, il faut faire attention à prendre la classe majoritaire , on ne peux pas faire la moyenne des classes.
+
+gdalwarp -te 42250 21170 295170 167700 -overwrite -tr 10 10 -co "COMPRESS=DEFLATE" dendro_hdom_8bits.tif dendro_hdom_10m.tif
+gdalwarp -te 42250 21170 295170 167700 -overwrite -tr 10 10 -co "COMPRESS=DEFLATE" dendro_cdom_8bits.tif dendro_cdom_10m.tif
+
+Je converti la couche des forêts ancienne au format raster, en gardant dans les valeurs des pixels le numéro de la "CLASS_CODE". Le code 1 correspond au forêt ancienne subnaturelle.
+
+gdal vector rasterize --attribute-name "CLASS_CODE" --ot Byte --extent 42250,21170,295170,167700 --crs "EPSG:31370" --overwrite --resolution 10,10 --co "COMPRESS=DEFLATE" --progress FORETANC__ANC_FOR_ACTU.shp FA.tif
+
+maintenant que j'ai déjà quelque un de mes couches d'input, je peux tester quelques seuils sur mes couches dendro pour visualiser le résultats. On le fera probablemet dans [R] car c'est plus lisible, mais dans un premier temps j'utilise encore une fois gdal car il est rapide et efficace:
+
+gdal raster calc -i "HDOM=dendro_hdom_10m.tif" -i "CDOM=dendro_cdom_10m.tif" -i "COMPO=compo_all_sp10m.tif" -i "FA=FA.tif" --calc "FA != 1 ? 1 : (COMPO == 4 || COMPO == 5 || COMPO== 7 || COMPO== 9) ? 2 : (CDOM!=255 && CDOM>100 && HDOM !=255 && HDOM > 20) ? 4 : 3 "  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o preCartoOGF.tif
+
+les valeurs de compo de 4, 5, 7 et 9 concerne les résineux. J'ai mis le seuil de CDom assez bas car une inspection visuelle me fait penser que les valeurs renseignées ne sont pas très élevées. du coup le résultat n'est pas très contraigant évidemment.
+
+petites explication de la syntaxe de l'expression:
+CONDITION ? valeur si VRAI : valeur si faux
+|| -> signifie OR, ou, dans une condition.
+&& -> signifie ET dans une condition
+je vérifie que CDOM et HDOM n'ont pas la valeur 255 car c'est la valeur qui correspond aux "No Data", mais gdal calc ne prend pas bien en compte les no data alors je m'en charge moi-même
+
+gdal raster calc -i "HDOM=dendro_hdom_10m.tif" -i "CDOM=dendro_cdom_10m.tif" -i "COMPO=compo_all_sp10m.tif" -i "FA=FA.tif" --calc "FA != 1 ? 1 : (COMPO == 4 || COMPO == 5 || COMPO== 7 || COMPO== 9) ? 2 : (CDOM!=255 && CDOM>130 && HDOM !=255 && HDOM > 20) ? 4 : 3 "  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o preCartoOGF_CDOM130.tif
+
+gdal raster calc -i "HDOM=dendro_hdom_10m.tif" -i "CDOM=dendro_cdom_10m.tif" -i "COMPO=compo_all_sp10m.tif" -i "FA=FA.tif" --calc "FA != 1 ? 1 : (COMPO == 4 || COMPO == 5 || COMPO== 7 || COMPO== 9) ? 2 : (CDOM!=255 && CDOM>150 && HDOM !=255 && HDOM > 20) ? 4 : 3 "  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o preCartoOGF_CDOM150.tif
+
+otbcli_BandMathX -il dendro_cdom_10m.tif -out dendro_cdom_max7x7.tif uint8 -exp 'vmax(im1b1N7x7)' -ram 8000
+otbcli_BandMathX -il dendro_cdom_10m.tif -out dendro_cdom_max5x5.tif uint8 -exp 'vmax(im1b1N5x5)' -ram 8000
+otbcli_BandMathX -il dendro_cdom_10m.tif -out dendro_cdom_max3x3.tif uint8 -exp 'vmax(im1b1N3x3)' -ram 8000
+otbcli_BandMathX -il dendro_cdom_10m.tif dendro_cdom_max3x3.tif dendro_cdom_max5x5.tif dendro_cdom_max7x7.tif -out dendro_cdom_max.tif uint8 -exp 'max(im1b1,im2b1,im3b1,im4b1)' -ram 8000 -> bug
+
+-> dommage, les no data créent une dilation négative de la couche dendro...
+
+otbcli_Smoothing -in dendro_cdom_10m.tif -type max -type.max.radius 3 -out dendro_cdom_max.tif
+
+
+otbcli_BandMathX -il dendro_cdom_10m.tif -out dendro_cdom_max40B.tif uint8 -exp 'vmax(im1b1,vmax(im1b1N3x3),vmax(im1b1N5x5))' -ram 8000
+
+-> je veux considérer les variables de peuplement à une résolution plus grossière. 
+
+im1 - mean( im1b1N5x5, im1b2N5x5, im1b3N5x5 )
+
+
+gdal raster calc -i "HDOM=dendro_hdom_10m.tif" -i "CDOM=dendro_cdom_maxConv7x7.tif" -i "COMPO=compo_all_sp10m.tif" -i "FA=FA.tif" --calc "FA != 1 ? 1 : (COMPO == 4 || COMPO == 5 || COMPO== 7 || COMPO== 9) ? 2 : (CDOM!=255 && CDOM>150 && HDOM !=255 && HDOM > 20) ? 4 : 3 "  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o preCartoOGF_CDOM150_conv7x7.tif
+

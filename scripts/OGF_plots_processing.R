@@ -18,9 +18,9 @@ path.dico.tables <- "/home/jo/Documents/OGF/collect/dico"
 # Open foris collect is used as form in a mobile application to collect all the dendrometric measurements, exept the one related to the GNSS
 # We export open foris data from the server in csv format and then we integrate them in the sqlite database
 # un dossier pour les entry, un pour les cleansing
-path.entry.collect.list <- paste0("/home/jo/Documents/OGF/collect/collect-C-2025-12-15")
+path.entry.collect.list <- paste0("/home/jo/Documents/OGF/collect/collect-C-2026-01-06")
 # quand on reçoit un nouvel encodage via le formulaire web, on l'ajoute à la bd OGF_all
-path.ogf.encodage.toadd <- "/home/jo/Documents/OGF/data/OGF20251202.db"
+path.ogf.encodage.toadd <- "/home/jo/Documents/OGF/data/OGF20260108.db"
 
 db.path <- paste0(basedir,"/data/OGF_all.db")
 db <- dbConnect(SQLite(),dbname=db.path)
@@ -97,8 +97,8 @@ dt_FAS <- dbReadTable(db ,"bois_mort_placette")
 # LIS is realized for 3 transects of 27 meters. 30 cm < logs < 90 cm
 dt_LIS <- dbReadTable(db ,"bois_mort_transect")
 
-dendro <- dbReadTable(db ,"dendro")
-ue_gnss <- dbReadTable(db ,"ue_gnss")
+dendro <- dbReadTable(db ,"dendro_plot")
+# ue_gnss <- dbReadTable(db ,"ue_gnss")
 
 ue_date <- as.Date(paste(ues$date_year,ues$date_month, ues$date_day,sep="-"))
 ues$lLIS <- 27
@@ -129,8 +129,18 @@ if (arbre$statut[i]==1){
   
   } else {
     # cylindre : pi r2 * h. Je devrais plutôt utiliser un défilement car un gros bois de 300 de tour ça ne fait pas un cylindre de 15 mètres de hauteur..
-    # tree taper equation  
-     arbre$v[i] <- ((arbre$circ[i]/100)^2)/(4*pi) * arbre$h[i]
+    # tree taper equation from IPRFW - hardwood only
+    taper <- 5
+    # ça c'est les hypothèses de JL
+    if (arbre$circ[i]>200){taper <- 15}
+    if (arbre$circ[i]<100){taper <- 2.5}
+    
+    # demi-hauteur là ou se situe la circ du milieu
+    hmil = arbre$h[i] * 0.5 - 1.5 # attention, 1.5 c'est la hauteur de mesure
+    cmil = arbre$circ[i] - hmil * taper # donc l'arbre perd 5 cm de circonférence par mètre de hauteur. Rondeux : pour la circonférence, le défilement varie généralement entre 0,5 et 5 cm/m
+    if (cmil>arbre$circ[i]){cmil<-arbre$circ[i]}
+    arbre$v[i] <- ((cmil/100)^2)/(4*pi) * arbre$h[i]
+    cat(paste("chandelle num ", i, " de hauteur", arbre$h[i], " et de circ ", arbre$circ[i]," ratio vol cylindre sans défilement sur cylindre avec défilement : ", round(100*(cmil/100)^2/((arbre$circ[i]/100)^2),0 ),"\n"))
       arbre$v_branches[i] <-0
   }
   } else {
@@ -161,8 +171,6 @@ arbre$fe[arbre$A5bool==0] <- 0 # pour repérer les arbres dominants de moins de 
 arbre$fe[arbre$statut==2  & arbre$circ>=40] <- feA5
 arbre$fe[arbre$statut==2  & arbre$circ<40] <- 0
 
-dbWriteTable(db,"arbre",arbre, overwrite=T)
-
 for (i in 1:nrow(cohorte)){
   # je n'ai pas l'essence, donc il me faut une essence par défaut pour le tarif de cubage. Feuillus divers
   if (cohorte$grosseur[i]==1){
@@ -192,8 +200,8 @@ dt_LIS$v <- 10000 * ((pi^2)/(8*(3*lLIS$lLIS)))*(dt_LIS$circ/(pi*100))^2
 dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_thres120=sum(fe),vol_alive_thres120 = sum(v_tc1*fe), basal_area_alive_thres120=sum((circ/100)^2*fe/(4*pi)))
 dendro_arbre_mort <- arbre[arbre$statut==2,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_dead_standing = sum((v)*fe), basal_area_dead=sum((circ/100)^2*fe/(4*pi)))
 dendro_cohorte <- cohorte %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_co=sum(nombre*feA3), vol_alive_co = sum(v*feA3), basal_area_alive_co=sum(nombre*(circ/100)^2*feA3/(4*pi)))
-dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_log_FAS = sum(v*feA4))
-dendro_LIS <- dt_LIS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_log_LIS = sum(v))
+dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4))
+dendro_LIS <- dt_LIS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_LIS = sum(v))
 
 #création matrice ogf x essence pour proportion de chaque essence dans l'UE
 e <- unique(arbre$ess)
@@ -220,11 +228,12 @@ dendro3 <-  merge(dendro2,gha_rel[,c(key_ue_cols,"essmaj")],by=key_ue_cols, all=
 dendro4 <-  merge(dendro3,dendro_FAS,by=key_ue_cols, all=T)
 dendro <-  merge(dendro4,dendro_LIS,by=key_ue_cols, all=T)
 
+
 dendro[is.na(dendro)] <- 0
 #, _co pour cohorte = arbres sous le seuil d'inventaire de 120 de circ. _thres120 pour les arbres de la table arbres
 dendro$number_of_trees <- dendro$number_of_trees_thres120 + dendro$number_of_trees_co
 dendro$vol_alive <- dendro$vol_alive_thres120 + dendro$vol_alive_co
-dendro$vol_deadw <- dendro$vol_dead_standing + dendro$vol_log_FAS + dendro$vol_log_LIS
+dendro$vol_deadw <- dendro$vol_dead_standing + dendro$vol_wood_debris_FAS + dendro$vol_wood_debris_LIS
 dendro$basal_area_alive <- dendro$basal_area_alive_thres120 + dendro$basal_area_alive_co
 # circonférence dominante: je prends les 5 plus gros arbres
 nDomTree <- 5
@@ -234,24 +243,37 @@ for (i in 1:nrow(dendro)){
   dendro$cdom[i] <- mean(c[1:min(nDomTree,length(c))])
 }
 
-dendro$pct_vol_dead_standing <- 100*dendro$vol_dead_standing/(dendro$vol_alive+dendro$vol_dead_standing)
+dendro$vol_dead_standing_ratio <- 100*dendro$vol_dead_standing/(dendro$vol_alive+dendro$vol_dead_standing)
 
-dbWriteTable(db,"dendro",dendro, overwrite=T)
+# réordonner les colonnes pour plus de logique et de lisibilité
+colOrder <- c("ues_id_ogf","ues_id_ue","essmaj","number_of_trees_co","number_of_trees_thres120","number_of_trees","basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead","vol_alive_co","vol_alive_thres120","vol_alive","vol_dead_standing","vol_dead_standing_ratio","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom")
+dendro <- dendro[,colOrder]
+# ajout mesure gha par relascope pour comparaison avec gha calculé
+dendro <- merge(dendro,ues[,c(key_ue_cols2,"gha_relascope")],by.x=key_ue_cols, by.y=key_ue_cols2 , all=F)
+
+# writing results in the database
+dbWriteTable(db,"arbre",arbre, overwrite=T)
+dbWriteTable(db,"bois_mort_transect",dt_LIS, overwrite=T)
+dbWriteTable(db,"bois_mort_placette",dt_FAS, overwrite=T)
+dbWriteTable(db,"dendro_plot",dendro, overwrite=T)
 dbDisconnect(db) 
 rm(db)
 
 # data flandre
 plot <- read.csv2("/home/jo/Documents/OGF/FLANDERS_stat_per_UE/plotinfo.csv")
 plot_dendro <- read.csv2("/home/jo/Documents/OGF/FLANDERS_stat_per_UE/plotlevel_data/dendro_by_plot.csv")
-sub_dendro <- plot_dendro[plot_dendro$plot_id %in% plot$plot_id[plot$forest_reserve=="Kersselaerspleyn"] & plot_dendro$year==2020,]
+# sub_dendro <- plot_dendro[plot_dendro$plot_id %in% plot$plot_id[plot$forest_reserve=="Kersselaerspleyn"] & plot_dendro$year==2020,]
 sub_plot <- plot[plot$forest_reserve=="Kersselaerspleyn" & plot$period==3,]
 
 fl1 <- cbind(sub_plot,sub_dendro)
 write.csv2(fl1,"/home/jo/Documents/OGF/FLANDERS_stat_per_UE/Kersselaerspleyn_dendro.csv",row.names =FALSE)
 sub_dendro <- plot_dendro[plot_dendro$year==2020,]
 
+# the 3 plots we have surveyed in Soignes forest with INBO team
+plot_dendro[plot_dendro$plot_id %in% c(2014,2015,2047) & plot_dendro$period==3,]
+
 library(reshape2)
-dw <- dendro[,c("vol_dead_standing","vol_log_FAS", "vol_log_LIS", "vol_deadw")]
+dw <- dendro[,c("vol_dead_standing","vol_wood_debris_FAS", "vol_wood_debris_LIS", "vol_deadw")]
 melted <- melt(dw)
 boxplot(data=melted, value~variable, ylim=c(0,200))
 summary(dw)

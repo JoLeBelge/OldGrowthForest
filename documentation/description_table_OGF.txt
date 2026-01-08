@@ -1,7 +1,6 @@
 TABLE arbre
 -----------
 
-
 ues_id_ogf 		-> identifiant du peuplement subnaturel mature (Old Growth Forest)
 ues_id_ue 		-> identifiant de la placette d'inventaire (plot - UE - Unité d'échantillonage)
 X_arbre_position	-> identifiant de l'arbre (numéro attribué automatiquement par Open Foris Collect)
@@ -23,27 +22,30 @@ v_tc1           	-> volume tarif de cubage à une entrée
 fe   			-> facteur d'extension de l'arbre
 
 
-TABLE dendro
-------------
+TABLE dendro_plot
+-----------------
 
 Les résultats dendrométrique par UE/plot
 
 ues_id_ogf,ues_id_ue -> voir ci-dessus
 
-number_of_trees_thres120 	-> nha (-/ha) pour les arbres vivants de plus de 120 de tour (plot A4 et A5)
-vol_alive_thres120 		-> volume (m3/ha) des troncs et des branches pour les arbres vivants de plus de 120 de tour (plot A4 et A5)
-basal_area_alive_thres120
-number_of_trees_co 		-> nha (-/ha) pour les arbres vivants entre 40 et 120 de circonférence. Ces arbres sont mesurés dans la placette A3 de 9 mètre de rayon et sont compté et regroupé en 3 catégorie de grosseur : 20-40 cm, 40-80 cm et 80-120 cm. voir cohorte_list
-vol_alive_co
-basal_area_alive_co
-vol_dead_standing 		-> volume (m3/ha) des chandelles et des bois mort sur pied (tronc + volume de houppier * crown volume reduction)
-basal_area_dead
+ues_id_ogf 			-> voir ci-dessus
+ues_id_ue 			-> voir ci-dessus
 essmaj 			-> les deux essences majoritaires en surface terrière 
-vol_log_FAS			-> volume des buches de plus de 90 cm de circonférence au gros bout, mesuré par FAS (full area sampling) sur la placette A4 (18 mètres de rayon
-vol_log_LIS			-> volume des buches de plus de 30 cm de circonférence et de moins de 90 cm de circonférence, mesuré par LIS (line intersect sampling)
-number_of_trees
-vol_alive
-vol_deadw			-> volume of dead wood = vol_dead_standing + vol_log_FAS + vol_log_LIS
-basal_area_alive
-cdom				-> circonférence dominante, les 5 plus gros bois de la placette A5 (=les 15 plus gros arbres à l'hectare)
-pct_vol_dead_standing   
+number_of_trees_co 		-> nha (-/ha) pour les arbres vivants entre 40 et 120 de circonférence. Ces arbres sont mesurés dans la placette A3 de 9 mètre de rayon et sont compté et regroupé en 3 catégorie de grosseur : 20-40 cm, 40-80 cm et 80-120 cm. voir cohorte_list
+number_of_trees_thres120	-> nha (-/ha) pour les arbres vivants de plus de 120 de tour (plot A4 et A5)
+number_of_trees 		-> nha cohorte + arbre circ >120 cm
+basal_area_alive_thres120 	-> basal area arbres circ >120 cm
+basal_area_alive_co 		-> basal area arbres circ <120 cm (cohorte)
+basal_area_alive		-> basal area cohorte + arbres circ >120 cm, all alive
+basal_area_dead 		-> basal area standing dead tree
+vol_alive_co 		
+vol_alive_thres120 		-> volume (m3/ha) des troncs et des branches pour les arbres vivants de plus de 120 de tour (plot A4 et A5)
+vol_alive 
+vol_dead_standing 		-> volume (m3/ha) des chandelles et des bois mort sur pied (tronc + volume de houppier * crown volume reduction)
+vol_dead_standing_ratio 
+vol_wood_debris_FAS 		-> volume du bois mort jusqu'à la recoupe de 90 cm de circonférence, mesuré par FAS (full area sampling) sur la placette A4 (18 mètres de rayon
+vol_wood_debris_LIS 		-> volume du bois mort de plus de 30 cm de circonférence et de moins de 90 cm de circonférences à l'intersection du transect, mesuré par LIS (line intersect sampling)
+vol_deadw 			-> volume of dead wood = vol_dead_standing + vol_wood_debris_FAS + vol_wood_debris_LIS
+cdom 				-> circonférence dominante, les 5 plus gros bois de la placette A5 (=les 15 plus gros arbres à l'hectare)
+
