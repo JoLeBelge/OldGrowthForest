@@ -48,4 +48,5 @@ vol_wood_debris_FAS 		-> volume du bois mort jusqu'à la recoupe de 90 cm de cir
 vol_wood_debris_LIS 		-> volume du bois mort de plus de 30 cm de circonférence et de moins de 90 cm de circonférences à l'intersection du transect, mesuré par LIS (line intersect sampling)
 vol_deadw 			-> volume of dead wood = vol_dead_standing + vol_wood_debris_FAS + vol_wood_debris_LIS
 cdom 				-> circonférence dominante, les 5 plus gros bois de la placette A5 (=les 15 plus gros arbres à l'hectare)
+gha relascope 			-> basal area measured with chain relascope of factor 2. Two or three operators perform the measurement and the average is computed
 
