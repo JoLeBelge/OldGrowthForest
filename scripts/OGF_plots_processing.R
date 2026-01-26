@@ -98,7 +98,7 @@ dt_FAS <- dbReadTable(db ,"bois_mort_placette")
 dt_LIS <- dbReadTable(db ,"bois_mort_transect")
 
 dendro <- dbReadTable(db ,"dendro_plot")
-# ue_gnss <- dbReadTable(db ,"ue_gnss")
+
 
 ue_date <- as.Date(paste(ues$date_year,ues$date_month, ues$date_day,sep="-"))
 ues$lLIS <- 27
@@ -243,6 +243,12 @@ for (i in 1:nrow(dendro)){
   dendro$cdom[i] <- mean(c[1:min(nDomTree,length(c))])
 }
 
+dendro$cdom_1 <- 
+  arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(cdom1=cdom_1(pick()))
+
+require("purrr")
+arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% mutate(temp = map(data, cdom_1)) 
+
 dendro$vol_dead_standing_ratio <- 100*dendro$vol_dead_standing/(dendro$vol_alive+dendro$vol_dead_standing)
 
 # réordonner les colonnes pour plus de logique et de lisibilité
@@ -251,11 +257,20 @@ dendro <- dendro[,colOrder]
 # ajout mesure gha par relascope pour comparaison avec gha calculé
 dendro <- merge(dendro,ues[,c(key_ue_cols2,"gha_relascope")],by.x=key_ue_cols, by.y=key_ue_cols2 , all=F)
 
+# STAND LEVEL
+var <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw")
+
+standard_error <- function(x) {
+  sd(x)/sqrt(length(x))
+}
+dendro_stand <- dendro %>% group_by(ues_id_ogf) %>% summarise(across(any_of(var), list(mean = mean, standard_error= standard_error), .names = "{.col}_{.fn}"))
+
 # writing results in the database
 dbWriteTable(db,"arbre",arbre, overwrite=T)
 dbWriteTable(db,"bois_mort_transect",dt_LIS, overwrite=T)
 dbWriteTable(db,"bois_mort_placette",dt_FAS, overwrite=T)
 dbWriteTable(db,"dendro_plot",dendro, overwrite=T)
+dbWriteTable(db,"dendro_stand",dendro_stand, overwrite=T)
 dbDisconnect(db) 
 rm(db)
 
@@ -277,3 +292,5 @@ dw <- dendro[,c("vol_dead_standing","vol_wood_debris_FAS", "vol_wood_debris_LIS"
 melted <- melt(dw)
 boxplot(data=melted, value~variable, ylim=c(0,200))
 summary(dw)
+
+./carteApt --outils 1 --gpkg_layer "centre_placettes" --gpkg "/home/jo/Téléchargements/ogf.gpkg" --layerCode dendro_cdom --pathBD "/home/jo/Documents/carteApt/GIS/dendro202601/aptitudeEssDB.db"

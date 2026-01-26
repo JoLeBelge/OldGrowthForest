@@ -4,15 +4,21 @@ library(terra)
 
 # comparaison donnée terrain et donnée télédétection
 # merge donnée sig et terrain (SetT pour SigEtTerrain) pour une comparaison. C'est pas beau à voir.
+ue_gnss <- dbReadTable(db ,"ue_gnss")
 
 sEtT <- merge(ue_gnss,dendro,by.x=key_ue_cols2,by.y=key_ue_cols, all=F)
 
 pngOut <- "/home/jo/Documents/OGF/out/validCarteDendro_"
 lim <- c(100,310)
-png(paste0(pngOut,"cdom.png"), width = 7.75, height = 5.75, res = 300, units = "in")
-plot(sEtT$cdom, sEtT$dendro_cdom, xlim=lim, ylim=lim,main="validation carte dendro - cdom", ylab="cdom CNN [cm]", xlab="cdom terrain [cm]")
+png(paste0(pngOut,"cdom202601.png"), width = 7.75, height = 5.75, res = 300, units = "in")
+plot(sEtT$cdom, sEtT$dendro_cdom2026, xlim=lim, ylim=lim,main="validation carte dendro - cdom", ylab="cdom CNN [cm]", xlab="cdom terrain [cm]")
+points(sEtT$cdom, sEtT$dendro_cdom2025, xlim=lim, ylim=lim,col="red")
+
 lines(lim,lim, type = "l",lwd=2, col="red")
 dev.off()
+
+
+
 lim <- c(200,600)
 png(paste0(pngOut,"vha.png"), width = 7.75, height = 5.75, res = 300, units = "in")
 plot(sEtT$vol_alive, sEtT$dendro_vha, xlim=lim, ylim=lim,main="validation carte dendro - vha", ylab="vha CNN [m3/ha]", xlab="vha terrain [m3/ha]")

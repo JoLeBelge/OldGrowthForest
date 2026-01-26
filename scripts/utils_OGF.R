@@ -40,3 +40,9 @@ vBranches <- function(c130, numtc) {
   }
   return (fvb)
 }
+
+cdom_1 <- function(x,nDomTree=10) {
+  c <-  sort(x$circ, decreasing=T)
+  result <- mean(c[1:min(nDomTree,length(c))])
+  return(result)
+}
