@@ -1,10 +1,10 @@
 # old growth forest characterization and mapping in Wallonia, 2025 - Gembloux Agro-Bio Tech
 # This script process field plot inventory data to compute dendrometric parameters with a focus on dead wood and large trees
 require(RSQLite)
-
 library(tools)
 library("readxl")
 library(dplyr)
+require("purrr")
 
 basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 # Léa: ici tu change la ligne et tu met ton répertoire à toi
@@ -20,7 +20,7 @@ path.dico.tables <- "/home/jo/Documents/OGF/collect/dico"
 # Open foris collect is used as form in a mobile application to collect all the dendrometric measurements, exept the one related to the GNSS
 # We export open foris data from the server in csv format and then we integrate them in the sqlite database
 # un dossier pour les entry, un pour les cleansing
-path.entry.collect.list <- paste0("/home/jo/Documents/OGF/collect/collect-C-2026-01-06")
+path.entry.collect.list <- paste0("/home/jo/Documents/OGF/collect/collect-C-2026-01-26")
 # quand on reçoit un nouvel encodage via le formulaire web, on l'ajoute à la bd OGF_all
 path.ogf.encodage.toadd <- "/home/jo/Documents/OGF/data/OGF20260108.db"
 
@@ -92,6 +92,7 @@ ues <- dbReadTable(db ,"ues")
 # check qu'il y ai bien une seule ligne par UE
 if(nrow(unique(ues[,c("id_ue", "id_ogf")]))!=nrow(ues)){
   cat("vérifier la table ues, certaines placettes apparaissent en doublons")
+  
 }
 
 # FAS is realized on the 18m plot. logs > 90 cm
@@ -230,28 +231,33 @@ dendro3 <-  merge(dendro2,gha_rel[,c(key_ue_cols,"essmaj")],by=key_ue_cols, all=
 dendro4 <-  merge(dendro3,dendro_FAS,by=key_ue_cols, all=T)
 dendro <-  merge(dendro4,dendro_LIS,by=key_ue_cols, all=T)
 
-
 dendro[is.na(dendro)] <- 0
 #, _co pour cohorte = arbres sous le seuil d'inventaire de 120 de circ. _thres120 pour les arbres de la table arbres
 dendro$number_of_trees <- dendro$number_of_trees_thres120 + dendro$number_of_trees_co
 dendro$vol_alive <- dendro$vol_alive_thres120 + dendro$vol_alive_co
 dendro$vol_deadw <- dendro$vol_dead_standing + dendro$vol_wood_debris_FAS + dendro$vol_wood_debris_LIS
 dendro$basal_area_alive <- dendro$basal_area_alive_thres120 + dendro$basal_area_alive_co
-# circonférence dominante: je prends les 5 plus gros arbres
-nDomTree <- 5
-for (i in 1:nrow(dendro)){
-  cond <- which(arbre$ues_id_ogf==dendro$ues_id_ogf[i] & arbre$ues_id_ue==dendro$ues_id_ue[i] & arbre$statut==1)
-  c <-  sort(arbre[cond,"circ"], decreasing=T)
-  dendro$cdom[i] <- mean(c[1:min(nDomTree,length(c))])
-}
-
-dendro$cdom_1 <- 
-  arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(cdom1=cdom_1(pick()))
-
-require("purrr")
-arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% mutate(temp = map(data, cdom_1)) 
-
 dendro$vol_dead_standing_ratio <- 100*dendro$vol_dead_standing/(dendro$vol_alive+dendro$vol_dead_standing)
+
+# circonférence dominante: je prends les 10 plus gros arbres par hectare
+n_tree_cdom <- 10
+plots_trees_coppices <- arbre %>% filter(statut==1) %>% group_by(ues_id_ogf,ues_id_ue) %>% arrange(desc(circ), .by_group = T) %>% mutate(fexthacumsum = cumsum(fe))
+dendro_cdom <- plots_trees_coppices %>% mutate(
+  idd = 1:n(),
+  whup = fexthacumsum > n_tree_cdom ,
+  whup2 = which(whup)[1],
+  fexthacumsum = ifelse(whup, n_tree_cdom , fexthacumsum),
+  diff = n_tree_cdom - c(0, fexthacumsum[-length(fexthacumsum)]),
+  fext_ha2 = case_when(
+    idd < whup2 ~ fe,
+    idd == whup2 ~ diff,
+    is.na(whup2) ~ fe,
+    T ~ 0
+  ),
+  Cha = circ * fext_ha2,
+  "cdom" :=  sum(Cha, na.rm = T) / sum(fext_ha2, na.rm = T)
+) %>% select(ues_id_ogf,ues_id_ue,cdom) %>% unique()
+dendro <- merge(dendro,dendro_cdom,by.x=key_ue_cols , all=F)
 
 # réordonner les colonnes pour plus de logique et de lisibilité
 colOrder <- c("ues_id_ogf","ues_id_ue","essmaj","number_of_trees_co","number_of_trees_thres120","number_of_trees","basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead","vol_alive_co","vol_alive_thres120","vol_alive","vol_dead_standing","vol_dead_standing_ratio","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom")
@@ -260,7 +266,7 @@ dendro <- dendro[,colOrder]
 dendro <- merge(dendro,ues[,c(key_ue_cols2,"gha_relascope")],by.x=key_ue_cols, by.y=key_ue_cols2 , all=F)
 
 # STAND LEVEL
-var <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw")
+var <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw", "cdom")
 
 standard_error <- function(x) {
   sd(x)/sqrt(length(x))
