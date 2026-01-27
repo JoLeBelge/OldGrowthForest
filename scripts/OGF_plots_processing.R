@@ -7,6 +7,8 @@ library("readxl")
 library(dplyr)
 
 basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
+# Léa: ici tu change la ligne et tu met ton répertoire à toi
+basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 setwd(basedir)
 
 # script qui contient la ou les fonctions utilisées , ici le tarif de cubage.
