@@ -1,2 +1,3 @@
 *.Rhistory
-lea/
+scripts/OGF_remoteSensing2.R
+lea/*
