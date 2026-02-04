@@ -5,6 +5,7 @@ library(tools)
 library("readxl")
 library(dplyr)
 require("purrr")
+require("magrittr")
 
 basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 # Léa: ici tu change la ligne et tu met ton répertoire à toi
@@ -214,14 +215,42 @@ e <- unique(arbre$ess)
 gha_rel <- data.frame(matrix(0,ncol=2+length(e),nrow=nrow(ues), dimnames=list(NULL,c(key_ue_cols, e))))
 gha_rel[,key_ue_cols] <- ues[, c("id_ogf", "id_ue")]
 # un gha par essence
-gha_ess <- arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue, ess) %>% summarise(gha_rel = sum((circ/100)^2*fe/(4*pi)))
+#gha_ess <- arbre[arbre$statut==1 & arbre$circ>120,] %>% group_by(ues_id_ogf,ues_id_ue, ess) %>% summarise(gha_rel = sum((circ/100)^2*fe/(4*pi)))
+n_tree_essMatureMaj <- 40
+plots_trees_coppices <- arbre %>% filter(statut==1) %>% group_by(ues_id_ogf,ues_id_ue) %>% arrange(desc(circ), .by_group = T) %>% mutate(fexthacumsum = cumsum(fe))
+
+gha_ess <- plots_trees_coppices %>% mutate(
+  idd = 1:n(),
+  whup = fexthacumsum > n_tree_essMatureMaj ,
+  whup2 = which(whup)[1],
+  fexthacumsum = ifelse(whup,n_tree_essMatureMaj , fexthacumsum),
+  diff = n_tree_essMatureMaj - c(0, fexthacumsum[-length(fexthacumsum)]),
+  fext_ha2 = case_when(
+    idd < whup2 ~ fe,
+    idd == whup2 ~ diff,
+    is.na(whup2) ~ fe,
+    T ~ 0
+  ),
+  Gha_dom = ((circ/100)^2*fext_ha2/(4*pi)) 
+  #,
+  #Cha = circ * fext_ha2,
+  #"cdom" :=  sum(Cha, na.rm = T) / sum(fext_ha2, na.rm = T)
+) %>% filter(Gha_dom>0) %>% group_by(ues_id_ogf,ues_id_ue, ess) %>% summarise(gha_ess = sum(Gha_dom))
+#%>% select(ues_id_ogf, ues_id_ue, ess,circ, fe,fext_ha2, fexthacumsum, Gha_dom)
+gha_rel1 <- merge(gha_ess,dendro_arbre_vivant[,c(key_ue_cols,"basal_area_alive_thres120")],by.x=key_ue_cols, by.y=key_ue_cols , all=F)
+gha_rel1 %<>% mutate(gha_rel=100*gha_ess/basal_area_alive_thres120)
+
+dendro_essMature <- gha_ess %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(gha_essMature = sum(gha_ess))
+
 # on divise par le gha (presque) total (celui des arbres de plus de 120)
 for (i in 1:nrow(gha_ess)){
   ogf <- gha_ess$ues_id_ogf[i]
   ue <- gha_ess$ues_id_ue[i]
   gha_ess$ess[i]
-  gha_rel[gha_rel$ues_id_ogf==ogf & gha_rel$ues_id_ue==ue, gha_ess$ess[i]] <-  100*gha_ess$gha_rel[i]/dendro_arbre_vivant$basal_area_alive_thres120[dendro_arbre_vivant$ues_id_ogf==ogf & dendro_arbre_vivant$ues_id_ue==ue]
-}
+  #gha_rel[gha_rel$ues_id_ogf==ogf & gha_rel$ues_id_ue==ue, gha_ess$ess[i]] <-  100*gha_ess$gha_ess[i]/dendro_arbre_vivant$basal_area_alive_thres120[dendro_arbre_vivant$ues_id_ogf==ogf & dendro_arbre_vivant$ues_id_ue==ue]
+  gha_rel[gha_rel$ues_id_ogf==ogf & gha_rel$ues_id_ue==ue, gha_ess$ess[i]] <-  100*gha_ess$gha_ess[i]/dendro_essMature$gha_essMature[dendro_essMature$ues_id_ogf==ogf & dendro_essMature$ues_id_ue==ue]
+  
+  }
 gha_rel$essmaj <- apply(gha_rel[,!colnames(gha_rel) %in% c(key_ue_cols,"essmaj")], 1, twoEssMaj)
 
 # fusion de toutes ces données en une table dendro - group by UE
