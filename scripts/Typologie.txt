@@ -1,0 +1,33 @@
+Regroupements
+
+Chêne total = somme des % des codes CH + CP + CS + CHs
+
+Érable = codes ER + EP + ES (catégorie Érablière)
+
+Règle spéciale : si l’essence dominante (1ère) est ER/EP/ES, alors Érablière quel que soit le %.
+
+Règles de classement (dans l’ordre)
+
+Chênaie : chêne total ≥ 66,7 %
+
+Hêtraie : HE ≥ 66,7 %
+
+Frênaie : FR ≥ 66,7 %
+
+Érablière : érable (ER/EP/ES) ≥ 66,7 % (sauf si déjà classée par la règle spéciale ci-dessus)
+
+Merisier : MR ≥ 66,7 %
+
+Chêne rouge : CR ≥ 66,7 %
+
+Hêtre – Chêne : (HE + chêne total) ≥ 66,7 % avec HE < 66,7 % et chêne < 66,7 %
+
+Chêne – Frêne : (FR + chêne total) ≥ 66,7 % avec FR < 66,7 % et chêne < 66,7 %
+
+Autres feuillus nobles : somme des feuillus nobles visibles dans les 2 dominantes ≥ 66,7 %, sans rentrer dans les cas 1–8
+
+nobles = HE, chênes, FR, érables, MR, CR
+
+Autres peuplements feuillus : si aucun cas précédent et la part de feuillus visibles dans les 2 dominantes ≥ 50 %
+
+Peuplement mélangé : sinon ( mixte)
