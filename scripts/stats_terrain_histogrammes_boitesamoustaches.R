@@ -162,10 +162,6 @@ cat("\nPDF boxplots :", out_pdf_box, "\n")
 
 #deadwoood 
 
-#moyenne globale sur le jeu de données
-# standing      FAS      LIS    total pct_standing  pct_FAS  pct_LIS
-#  1516.789 2677.632 2023.504 6217.926   24.39381 43.06311 32.54307
-
 
 library(dplyr)
 
@@ -186,6 +182,12 @@ deadw_global_sum <- df %>%
   )
 
 deadw_global_sum
+
+#moyenne globale sur le jeu de données
+# standing      FAS      LIS    total pct_standing  pct_FAS  pct_LIS
+#  1516.789 2677.632 2023.504 6217.926   24.39381 43.06311 32.54307
+
+
 
 
 #moyenne par typologie 
@@ -256,7 +258,6 @@ p2 <- ggplot(plot_deadw_ue, aes(x = typologie, y = pct)) +
   theme_minimal() +
   labs(title = "Dispersion des parts de deadwood par UE (boxplots)",
        x = "Typologie", y = "% par UE")
-
 # -------------------------
 # 3) Export PDF unique
 # -------------------------
@@ -267,3 +268,75 @@ print(p2)
 dev.off()
 
 cat("PDF deadwood créé :", out_pdf_deadw, "\n")
+
+
+# =========================
+# 4) TABLEAUX : moyennes & dispersion par typologie (sans doublons)
+# =========================
+
+# --- A) Tableau "core" : mean + sd pour les variables clés ---
+vars_core <- c(
+  "number_of_trees",
+  "basal_area_alive",
+  "basal_area_dead",
+  "vol_alive",
+  "vol_deadw",
+  "cdom",
+  "gha_relascope"
+)
+
+tab_typo_core <- dendro_plot %>%
+  filter(!is.na(typologie)) %>%
+  group_by(typologie) %>%
+  summarise(
+    n = n(),
+    across(any_of(vars_core),
+           list(mean = ~mean(.x, na.rm = TRUE),
+                sd   = ~sd(.x, na.rm = TRUE)),
+           .names = "{.col}_{.fn}"),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(vol_deadw_mean))
+
+# Export CSV
+out_csv_typo_core <- file.path(out_dir, "table_moy_sd_par_typologie_vars_core.csv")
+write.csv2(tab_typo_core, out_csv_typo_core, row.names = FALSE)
+cat("CSV core :", out_csv_typo_core, "\n")
+
+
+# --- B) Tableau "deadwood focus" : vol_deadw + composantes + mean/median/sd/se ---
+standard_error <- function(x) {
+  x <- x[!is.na(x)]
+  sd(x) / sqrt(length(x))
+}
+
+tab_deadwood_focus <- dendro_plot %>%
+  filter(!is.na(typologie)) %>%
+  group_by(typologie) %>%
+  summarise(
+    n_UE = sum(!is.na(vol_deadw)),
+    
+    vol_deadw_mean   = mean(vol_deadw, na.rm = TRUE),
+    vol_deadw_median = median(vol_deadw, na.rm = TRUE),
+    vol_deadw_sd     = sd(vol_deadw, na.rm = TRUE),
+    vol_deadw_se     = standard_error(vol_deadw),
+    
+    standing_mean = mean(vol_dead_standing, na.rm = TRUE),
+    FAS_mean      = mean(vol_wood_debris_FAS, na.rm = TRUE),
+    LIS_mean      = mean(vol_wood_debris_LIS, na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>%
+  arrange(desc(vol_deadw_mean))
+
+# Export CSV
+out_csv_deadwood_focus <- file.path(out_dir, "table_deadwood_focus_par_typologie.csv")
+write.csv2(tab_deadwood_focus, out_csv_deadwood_focus, row.names = FALSE)
+cat("CSV deadwood focus :", out_csv_deadwood_focus, "\n")
+
+
+
+
+
+
+
