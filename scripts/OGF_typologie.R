@@ -126,3 +126,69 @@ dendro_plot %>%
   arrange(desc(n_lignes))
 
 
+
+
+
+
+
+
+
+library(DBI)
+library(RSQLite)
+library(dplyr)
+
+chemin_bd <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all.db"
+con <- dbConnect(RSQLite::SQLite(), chemin_bd)
+
+# lire tables
+dendro_plot <- dbReadTable(con, "dendro_plot")
+arbre <- dbReadTable(con, "arbre")
+
+key <- c("ues_id_ogf", "ues_id_ue")
+
+# 1) Plus gros arbre (vivant) par UE
+max_tree <- arbre %>%
+  filter(statut == 1, !is.na(circ), circ > 0, !is.na(ess), ess != "") %>%
+  group_by(ues_id_ogf, ues_id_ue) %>%
+  slice_max(order_by = circ, n = 1, with_ties = FALSE) %>%
+  transmute(
+    ues_id_ogf, ues_id_ue,
+    CIR_max = circ,
+    ess_max = ess
+  ) %>%
+  ungroup()
+
+# 2) Injecter dans dendro_plot (en mémoire)
+dendro_plot2 <- dendro_plot %>%
+  left_join(max_tree, by = key)
+
+# 3) Ajouter colonnes dans SQLite si besoin
+cols <- dbGetQuery(con, "PRAGMA table_info(dendro_plot);")$name
+if (!"CIR_max" %in% cols) dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN CIR_max REAL;")
+if (!"ess_max" %in% cols) dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN ess_max TEXT;")
+
+# 4) Update via rowid (comme tu fais pour typologie)
+rowids <- dbGetQuery(con, "SELECT rowid FROM dendro_plot;")
+stopifnot(nrow(rowids) == nrow(dendro_plot2))
+
+tmp <- data.frame(
+  rowid = rowids$rowid,
+  CIR_max = dendro_plot2$CIR_max,
+  ess_max = dendro_plot2$ess_max
+)
+
+dbWriteTable(con, "tmp_max_tree", tmp, overwrite = TRUE)
+
+dbExecute(con, "
+  UPDATE dendro_plot
+  SET
+    CIR_max = (SELECT CIR_max FROM tmp_max_tree WHERE tmp_max_tree.rowid = dendro_plot.rowid),
+    ess_max = (SELECT ess_max FROM tmp_max_tree WHERE tmp_max_tree.rowid = dendro_plot.rowid);
+")
+
+dbExecute(con, "DROP TABLE tmp_max_tree;")
+
+dbDisconnect(con)
+
+# check rapide
+dendro_plot2 %>% count(ess_max, sort = TRUE)
