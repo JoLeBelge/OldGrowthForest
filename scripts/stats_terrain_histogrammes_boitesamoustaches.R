@@ -1,224 +1,136 @@
+# =========================================================
+# ANALYSES OGF - typologie_mature_simplifiee (TERRAIN ONLY)
+# - N plots par typologie
+# - Deadwood : stats vol_deadw (mean/median/sd/se) par typologie
+# - Deadwood : standing/FAS/LIS (moyennes + totaux) par typologie
+# - Graphs deadwood (PDF)
+# - CDOM : stats + QUANTILES q05/q10/q25/q50/q75 (+ q90 bonus) par typologie
+# - Histogrammes CDOM + lignes quantiles (PDF)
+# =========================================================
+
 library(DBI)
 library(RSQLite)
 library(dplyr)
 library(tidyr)
-library(stringr)
 library(ggplot2)
+library(stringr)
 
-# --- Chemins ---
+# -------------------------
+# 0) Chemins
+# -------------------------
 db_path  <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all.db"
 data_dir <- dirname(db_path)
 out_dir  <- file.path(data_dir, "outputs")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-con <- dbConnect(RSQLite::SQLite(), db_path)
-
-# Recharge la table (avec typologie déjà présente dans la DB)
-dendro_plot <- dbReadTable(con, "dendro_plot")
-dbDisconnect(con)
-
-# --- Variables à analyser ---
-vars <- c(
-  "number_of_trees",
-  "basal_area_alive",
-  "basal_area_dead",
-  "vol_alive",
-  "vol_deadw",
-  "cdom",
-  "gha_relascope"
-)
-
-# =========================
-# 1) PDF : histogrammes tous les plots + encart stats
-# =========================
-df_long <- dendro_plot %>%
-  select(all_of(vars)) %>%
-  pivot_longer(everything(), names_to = "variable", values_to = "valeur") %>%
-  filter(!is.na(valeur))
-
-stats_var <- df_long %>%
-  group_by(variable) %>%
-  summarise(
-    moyenne = mean(valeur),
-    mediane = median(valeur),
-    ecart_type = sd(valeur),
-    .groups = "drop"
-  ) %>%
-  mutate(label = paste0("moy = ", round(moyenne, 2),
-                        "\nmed = ", round(mediane, 2),
-                        "\nsd = ", round(ecart_type, 2)))
-
-p_global <- ggplot(df_long, aes(x = valeur)) +
-  geom_histogram(bins = 30) +
-  facet_wrap(~variable, scales = "free") +
-  geom_text(
-    data = stats_var,
-    aes(x = Inf, y = Inf, label = label),
-    hjust = 1.1, vjust = 1.1,
-    inherit.aes = FALSE,
-    size = 3
-  ) +
-  theme_minimal() +
-  labs(title = "Histogrammes (tous les plots)", x = NULL, y = "Nombre de plots")
-
-out_pdf_global <- file.path(out_dir, "histogrammes_tous_plots.pdf")
-ggsave(out_pdf_global, plot = p_global, width = 11, height = 8.5, units = "in")
-
-
-# =========================
-# 2) PDF multi-pages : histogrammes par typologie (1 page par variable)
-# =========================
-out_pdf_typo <- file.path(out_dir, "histos_par_typologie.pdf")
-pdf(out_pdf_typo, width = 11, height = 8.5)
-
-for (v in vars) {
-  
-  df_v <- dendro_plot %>%
-    select(typologie, valeur = all_of(v)) %>%
-    filter(!is.na(typologie), !is.na(valeur))
-  
-  stats_typo <- df_v %>%
-    group_by(typologie) %>%
-    summarise(
-      moyenne = mean(valeur),
-      mediane = median(valeur),
-      ecart_type = sd(valeur),
-      .groups = "drop"
-    ) %>%
-    mutate(label = paste0("moy = ", round(moyenne, 2),
-                          "\nmed = ", round(mediane, 2),
-                          "\nsd = ", round(ecart_type, 2)))
-  
-  p <- ggplot(df_v, aes(x = valeur)) +
-    geom_histogram(bins = 30) +
-    facet_wrap(~typologie, scales = "free") +
-    geom_text(
-      data = stats_typo,
-      aes(x = Inf, y = Inf, label = label),
-      hjust = 1.1, vjust = 1.1,
-      inherit.aes = FALSE,
-      size = 3
-    ) +
-    theme_minimal() +
-    labs(
-      title = paste("Histogramme de", v, "par typologie"),
-      x = v, y = "Nombre de plots"
-    )
-  
-  print(p)  # => 1 page par variable dans le PDF
-}
-
-dev.off()
-
-cat("\nPDF global :", out_pdf_global, "\n")
-cat("PDF par typologie :", out_pdf_typo, "\n")
-cat("Dossier output :", out_dir, "\n")
-
-
-
-
-
-# =========================
-# 3) PDF multi-pages : boxplots par typologie (1 page par variable)
-# =========================
-out_pdf_box <- file.path(out_dir, "boxplots_par_typologie.pdf")
-pdf(out_pdf_box, width = 11, height = 8.5)
-
-for (v in vars) {
-  
-  df_v <- dendro_plot %>%
-    select(typologie, valeur = all_of(v)) %>%
-    filter(!is.na(typologie), !is.na(valeur))
-  
-  # stats optionnelles (n, moyenne, médiane, sd) pour affichage si tu veux
-  stats_typo <- df_v %>%
-    group_by(typologie) %>%
-    summarise(
-      n = n(),
-      moyenne = mean(valeur),
-      mediane = median(valeur),
-      ecart_type = sd(valeur),
-      .groups = "drop"
-    )
-  
-  p <- ggplot(df_v, aes(x = typologie, y = valeur)) +
-    geom_boxplot(outlier.alpha = 0.3) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(
-      title = paste("Boxplot de", v, "par typologie"),
-      x = "Typologie", y = v
-    )
-  
-  print(p)
-}
-
-dev.off()
-cat("\nPDF boxplots :", out_pdf_box, "\n")
-
-
-
-
-
-#deadwoood 
-
-
-library(dplyr)
-
-df <- dendro_plot %>%
-  mutate(deadw_total = vol_dead_standing + vol_wood_debris_FAS + vol_wood_debris_LIS)
-
-deadw_global_sum <- df %>%
-  summarise(
-    standing = sum(vol_dead_standing, na.rm = TRUE),
-    FAS      = sum(vol_wood_debris_FAS, na.rm = TRUE),
-    LIS      = sum(vol_wood_debris_LIS, na.rm = TRUE)
-  ) %>%
-  mutate(
-    total = standing + FAS + LIS,
-    pct_standing = 100 * standing / total,
-    pct_FAS      = 100 * FAS / total,
-    pct_LIS      = 100 * LIS / total
-  )
-
-deadw_global_sum
-
-#moyenne globale sur le jeu de données
-# standing      FAS      LIS    total pct_standing  pct_FAS  pct_LIS
-#  1516.789 2677.632 2023.504 6217.926   24.39381 43.06311 32.54307
-
-
-
-
-#moyenne par typologie 
-
-deadw_bytypologie_sum <- df %>%
-  group_by(typologie) %>%
-  summarise(
-    standing = sum(vol_dead_standing, na.rm = TRUE),
-    FAS      = sum(vol_wood_debris_FAS, na.rm = TRUE),
-    LIS      = sum(vol_wood_debris_LIS, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    total = standing + FAS + LIS,
-    pct_standing = ifelse(total > 0, 100 * standing / total, NA_real_),
-    pct_FAS      = ifelse(total > 0, 100 * FAS / total, NA_real_),
-    pct_LIS      = ifelse(total > 0, 100 * LIS / total, NA_real_)
-  ) %>%
-  arrange(desc(total))
-
-deadw_bytypologie_sum
-
-
 # fermer tout device PDF resté ouvert
 while (dev.cur() > 1) dev.off()
 
+# -------------------------
+# 1) Lecture DB
+# -------------------------
+con <- dbConnect(RSQLite::SQLite(), db_path)
+dendro_plot <- dbReadTable(con, "dendro_plot")
+dbDisconnect(con)
 
 # -------------------------
-# 1) p1 : barres empilées 100% (composition par typologie, sur sommes)
+# 2) Typologie de travail
 # -------------------------
-plot_deadw_sum <- deadw_bytypologie_sum %>%
+typo_col <- "typologie_mature_simplifiee"
+stopifnot(typo_col %in% colnames(dendro_plot))
+
+df <- dendro_plot %>%
+  mutate(typologie = .data[[typo_col]])
+
+# -------------------------
+# 3) Nombre de plots par typologie
+# -------------------------
+tab_n_by_typo <- df %>%
+  filter(!is.na(typologie), typologie != "") %>%
+  count(typologie, name = "n_plots") %>%
+  arrange(desc(n_plots))
+
+out_csv_n <- file.path(out_dir, "n_plots_par_typologie_mature_simplifiee.csv")
+write.csv2(tab_n_by_typo, out_csv_n, row.names = FALSE)
+
+cat("CSV n plots :", out_csv_n, "\n")
+print(tab_n_by_typo)
+
+# =========================================================
+# DEADWOOD
+# =========================================================
+
+standard_error <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x) <= 1) return(NA_real_)
+  sd(x) / sqrt(length(x))
+}
+
+# -------------------------
+# 4) Deadwood : stats vol_deadw (mean/median/sd/se) par typologie
+# -------------------------
+tab_deadw_stats <- df %>%
+  filter(!is.na(typologie), typologie != "") %>%
+  group_by(typologie) %>%
+  summarise(
+    n = sum(is.finite(vol_deadw)),
+    vol_deadw_mean   = mean(vol_deadw, na.rm = TRUE),
+    vol_deadw_median = median(vol_deadw, na.rm = TRUE),
+    vol_deadw_sd     = sd(vol_deadw, na.rm = TRUE),
+    vol_deadw_se     = standard_error(vol_deadw),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(vol_deadw_mean))
+
+out_csv_deadw_stats <- file.path(out_dir, "deadwood_vol_deadw_stats_par_typologie_mature_simplifiee.csv")
+write.csv2(tab_deadw_stats, out_csv_deadw_stats, row.names = FALSE)
+cat("CSV deadwood stats :", out_csv_deadw_stats, "\n")
+
+# -------------------------
+# 5) Deadwood composantes : moyennes par UE + totaux + % composition
+# -------------------------
+tab_deadw_components_mean <- df %>%
+  filter(!is.na(typologie), typologie != "") %>%
+  group_by(typologie) %>%
+  summarise(
+    n = n(),
+    standing_mean = mean(vol_dead_standing, na.rm = TRUE),
+    FAS_mean      = mean(vol_wood_debris_FAS, na.rm = TRUE),
+    LIS_mean      = mean(vol_wood_debris_LIS, na.rm = TRUE),
+    vol_deadw_mean = mean(vol_deadw, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(vol_deadw_mean))
+
+out_csv_deadw_comp_mean <- file.path(out_dir, "deadwood_components_mean_par_typologie_mature_simplifiee.csv")
+write.csv2(tab_deadw_components_mean, out_csv_deadw_comp_mean, row.names = FALSE)
+cat("CSV deadwood composantes (moyennes) :", out_csv_deadw_comp_mean, "\n")
+
+tab_deadw_components_total <- df %>%
+  filter(!is.na(typologie), typologie != "") %>%
+  group_by(typologie) %>%
+  summarise(
+    standing_sum = sum(vol_dead_standing, na.rm = TRUE),
+    FAS_sum      = sum(vol_wood_debris_FAS, na.rm = TRUE),
+    LIS_sum      = sum(vol_wood_debris_LIS, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    total_sum = standing_sum + FAS_sum + LIS_sum,
+    pct_standing = ifelse(total_sum > 0, 100 * standing_sum / total_sum, NA_real_),
+    pct_FAS      = ifelse(total_sum > 0, 100 * FAS_sum      / total_sum, NA_real_),
+    pct_LIS      = ifelse(total_sum > 0, 100 * LIS_sum      / total_sum, NA_real_)
+  ) %>%
+  arrange(desc(total_sum))
+
+out_csv_deadw_comp_total <- file.path(out_dir, "deadwood_components_total_par_typologie_mature_simplifiee.csv")
+write.csv2(tab_deadw_components_total, out_csv_deadw_comp_total, row.names = FALSE)
+cat("CSV deadwood composantes (totaux + %) :", out_csv_deadw_comp_total, "\n")
+
+# -------------------------
+# 6) Graph deadwood : barres 100% + boxplots des % par UE
+# -------------------------
+plot_deadw_sum <- tab_deadw_components_total %>%
   select(typologie, pct_standing, pct_FAS, pct_LIS) %>%
   pivot_longer(starts_with("pct_"), names_to = "type", values_to = "pct") %>%
   mutate(type = recode(type,
@@ -230,14 +142,12 @@ p1 <- ggplot(plot_deadw_sum, aes(x = typologie, y = pct, fill = type)) +
   geom_col() +
   coord_flip() +
   theme_minimal() +
-  labs(title = "Deadwood par typologie : répartition (%)",
-       x = "Typologie", y = "% du deadwood (sur volumes totaux)", fill = "") +
+  labs(title = "Deadwood par typologie (totaux) : répartition (%)",
+       x = "Typologie (mature simplifiée)", y = "% du deadwood", fill = "") +
   theme(axis.text.y = element_text(size = 9))
 
-# -------------------------
-# 2) p2 : boxplots (dispersion des % par UE)
-# -------------------------
 plot_deadw_ue <- df %>%
+  filter(!is.na(typologie), typologie != "") %>%
   mutate(
     pct_standing = ifelse(vol_deadw > 0, 100 * vol_dead_standing / vol_deadw, NA_real_),
     pct_FAS      = ifelse(vol_deadw > 0, 100 * vol_wood_debris_FAS / vol_deadw, NA_real_),
@@ -249,94 +159,90 @@ plot_deadw_ue <- df %>%
                        pct_standing = "Bois mort debout",
                        pct_FAS      = "Gros bois couché (FAS)",
                        pct_LIS      = "Bois couché moyen (LIS)")) %>%
-  filter(!is.na(typologie), is.finite(pct))
+  filter(is.finite(pct))
 
 p2 <- ggplot(plot_deadw_ue, aes(x = typologie, y = pct)) +
   geom_boxplot(outlier.alpha = 0.3) +
   coord_flip() +
   facet_wrap(~type, ncol = 1) +
   theme_minimal() +
-  labs(title = "Dispersion des parts de deadwood par UE (boxplots)",
-       x = "Typologie", y = "% par UE")
-# -------------------------
-# 3) Export PDF unique
-# -------------------------
-out_pdf_deadw <- file.path(out_dir, "graph_deadwood.pdf")
+  labs(title = "Dispersion des parts (%) de deadwood par UE",
+       x = "Typologie (mature simplifiée)", y = "% par UE")
+
+out_pdf_deadw <- file.path(out_dir, "graph_deadwood_typologie_mature_simplifiee.pdf")
 pdf(out_pdf_deadw, width = 11, height = 8.5)
 print(p1)
 print(p2)
 dev.off()
+cat("PDF deadwood :", out_pdf_deadw, "\n")
 
-cat("PDF deadwood créé :", out_pdf_deadw, "\n")
+# =========================================================
+# CDOM : QUANTILES MULTIPLES + HISTOGRAMMES
+# =========================================================
 
+df_cdom <- df %>%
+  filter(!is.na(typologie), typologie != "", is.finite(cdom))
 
-# =========================
-# 4) TABLEAUX : moyennes & dispersion par typologie (sans doublons)
-# =========================
-
-# --- A) Tableau "core" : mean + sd pour les variables clés ---
-vars_core <- c(
-  "number_of_trees",
-  "basal_area_alive",
-  "basal_area_dead",
-  "vol_alive",
-  "vol_deadw",
-  "cdom",
-  "gha_relascope"
-)
-
-tab_typo_core <- dendro_plot %>%
-  filter(!is.na(typologie)) %>%
+# Quantiles à sortir (ceux discutés) + q90 bonus
+tab_cdom_q <- df_cdom %>%
   group_by(typologie) %>%
   summarise(
     n = n(),
-    across(any_of(vars_core),
-           list(mean = ~mean(.x, na.rm = TRUE),
-                sd   = ~sd(.x, na.rm = TRUE)),
-           .names = "{.col}_{.fn}"),
+    cdom_mean = mean(cdom, na.rm = TRUE),
+    cdom_sd   = sd(cdom, na.rm = TRUE),
+    q05 = quantile(cdom, 0.05, na.rm = TRUE, names = FALSE),
+    q10 = quantile(cdom, 0.10, na.rm = TRUE, names = FALSE),
+    q25 = quantile(cdom, 0.25, na.rm = TRUE, names = FALSE),
+    q50 = quantile(cdom, 0.50, na.rm = TRUE, names = FALSE),
+    q75 = quantile(cdom, 0.75, na.rm = TRUE, names = FALSE),
+    q90 = quantile(cdom, 0.90, na.rm = TRUE, names = FALSE),
     .groups = "drop"
   ) %>%
-  arrange(desc(vol_deadw_mean))
+  arrange(typologie)
 
-# Export CSV
-out_csv_typo_core <- file.path(out_dir, "table_moy_sd_par_typologie_vars_core.csv")
-write.csv2(tab_typo_core, out_csv_typo_core, row.names = FALSE)
-cat("CSV core :", out_csv_typo_core, "\n")
+out_csv_cdom_q <- file.path(out_dir, "seuils_cdom_q05_q10_q25_q50_q75_q90_par_typologie_mature_simplifiee.csv")
+write.csv2(tab_cdom_q, out_csv_cdom_q, row.names = FALSE)
+cat("CSV seuils CDOM multi-quantiles :", out_csv_cdom_q, "\n")
 
+# Préparer les seuils en format long pour tracer les lignes
+tab_cdom_q_long <- tab_cdom_q %>%
+  select(typologie, q05, q10, q25, q50, q75, q90) %>%
+  pivot_longer(cols = starts_with("q"),
+               names_to = "quantile",
+               values_to = "seuil")
 
-# --- B) Tableau "deadwood focus" : vol_deadw + composantes + mean/median/sd/se ---
-standard_error <- function(x) {
-  x <- x[!is.na(x)]
-  sd(x) / sqrt(length(x))
-}
+# Histogrammes par typologie + lignes des quantiles
+p_cdom_hist <- ggplot(df_cdom, aes(x = cdom)) +
+  geom_histogram(bins = 25) +
+  geom_vline(
+    data = tab_cdom_q_long,
+    aes(xintercept = seuil, linetype = quantile),
+    linewidth = 0.6
+  ) +
+  facet_wrap(~typologie, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "CDOM par typologie : histogrammes + seuils q05/q10/q25/q50/q75 (+q90)",
+    x = "CDOM",
+    y = "Nombre d'UE",
+    linetype = "Quantile"
+  )
 
-tab_deadwood_focus <- dendro_plot %>%
-  filter(!is.na(typologie)) %>%
-  group_by(typologie) %>%
-  summarise(
-    n_UE = sum(!is.na(vol_deadw)),
-    
-    vol_deadw_mean   = mean(vol_deadw, na.rm = TRUE),
-    vol_deadw_median = median(vol_deadw, na.rm = TRUE),
-    vol_deadw_sd     = sd(vol_deadw, na.rm = TRUE),
-    vol_deadw_se     = standard_error(vol_deadw),
-    
-    standing_mean = mean(vol_dead_standing, na.rm = TRUE),
-    FAS_mean      = mean(vol_wood_debris_FAS, na.rm = TRUE),
-    LIS_mean      = mean(vol_wood_debris_LIS, na.rm = TRUE),
-    
-    .groups = "drop"
-  ) %>%
-  arrange(desc(vol_deadw_mean))
+out_pdf_cdom <- file.path(out_dir, "hist_cdom_quantiles_typologie_mature_simplifiee.pdf")
+pdf(out_pdf_cdom, width = 11, height = 8.5)
+print(p_cdom_hist)
+dev.off()
+cat("PDF histogrammes CDOM :", out_pdf_cdom, "\n")
 
-# Export CSV
-out_csv_deadwood_focus <- file.path(out_dir, "table_deadwood_focus_par_typologie.csv")
-write.csv2(tab_deadwood_focus, out_csv_deadwood_focus, row.names = FALSE)
-cat("CSV deadwood focus :", out_csv_deadwood_focus, "\n")
-
-
-
-
-
-
-
+# -------------------------
+# FIN
+# -------------------------
+cat("\n--- FIN ---\n",
+    "Outputs dans : ", out_dir, "\n",
+    "- ", basename(out_csv_n), "\n",
+    "- ", basename(out_csv_deadw_stats), "\n",
+    "- ", basename(out_csv_deadw_comp_mean), "\n",
+    "- ", basename(out_csv_deadw_comp_total), "\n",
+    "- ", basename(out_pdf_deadw), "\n",
+    "- ", basename(out_csv_cdom_q), "\n",
+    "- ", basename(out_pdf_cdom), "\n", sep = "")

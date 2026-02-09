@@ -161,6 +161,7 @@ trees_top <- arbre %>%
   filter(gha_dom > 0) %>%
   ungroup()
 
+
 codes_exclure <- c("CR","MZ","DO")
 
 ue_exclues <- trees_top %>%
