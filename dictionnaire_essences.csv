@@ -1,0 +1,54 @@
+﻿code,name,short,latin,type
+1,Chênes indigènes,CH-IN,Quercus sp.,Feuillu
+2,Chêne rouge,CH-RO,Quercus rubra,Feuillu
+3,Hêtre,HETRE,Fagus sylvatica,Feuillu
+4,Erable sycomore,ER-SY,Acer pseudoplatanus,Feuillu
+5,Frêne,FRENE,Fraxinus excelsior,Feuillu
+6,Ormes,ORMES,Ulmus sp.,Feuillu
+7,Merisier,MERIS,Prunus avium,Feuillu
+8,Aubépines,AUBEP,Crataegus sp.,Feuillu
+9,Prunellier,PRUNE,Prunus spinosa,Feuillu
+10,Feuillus divers,FE-DI,miscel. broad-leaved,Feuillu
+11,Bouleau,BOULE,Betula sp.,Feuillu
+12,Aulne blanc,AU-BL,Alnus incana,Feuillu
+13,Aulne glutineux,AU-GL,Alnus glutinosa,Feuillu
+14,Charme,CHARM,Carpinus betulus,Feuillu
+15,Châtaignier,CHATA,Castanea sativa,Feuillu
+16,Erable plane,ER-PL,Acer platanoides,Feuillu
+17,Erable champêtre,ER-CH,Acer campestre,Feuillu
+18,Sorbier,SORBI,Sorbus aucuparia,Feuillu
+19,Marronnier,MARRO,Aesculus hippocastanum,Feuillu
+20,Noisetier,NOISE,Corylus avellana,Feuillu
+21,Noyers,NOYER,Juglans regia,Feuillu
+24,Peuplier hybride,PE-NO,Populus x,Feuillu
+25,Peuplier tremble,PE-TR,Populus tremula,Feuillu
+26,Robinier,ROBIN,Robinia pseudacacia,Feuillu
+27,Saule marsault,SA-MA,Salix caprea,Feuillu
+28,Autres saules,AUT-S,Salix sp.,Feuillu
+29,Tilleuls,TILLE,Tilia sp.,Feuillu
+30,Pommier,POMMI,Malus sylvestris,Feuillu
+31,Poirier,POIRI,Pyrus communis,Feuillu
+32,Alisiers,ALISI,Sorbus sp.,Feuillu
+33,Sureaux,SUREA,Sambucus sp.,Feuillu
+34,Bourdaine,BOURD,Frangula alnus,Feuillu
+35,Cerisiers,CERIS,Prunus sp.,Feuillu
+41,Epicéa commun,EP-CO,Picea abies,Résineux
+42,Epicéa de Sitka,SITKA,Picea sitchensis,Résineux
+43,Sapin de Douglas,DOUGL,Pseudotsuga menziesii,Résineux
+44,Mélèze,MELEZ,Larix sp.,Résineux
+45,Pin sylvestre,PI-SY,Pinus sylvestris,Résineux
+46,Pin noir d'Autriche,P-N-A,Pinus nigra (Autriche),Résineux
+47,Pin noir de Corse,P-N-C,Pinus nigra (Corse),Résineux
+48,Pin weymouth,PI-WE,Pinus strobus,Résineux
+49,Sapin pectiné,PECTI,Abies alba,Résineux
+50,Sapin de Vancouver,GRAND,Abies grandis,Résineux
+51,Autres sapins,AUT-S,Abies sp.,Résineux
+52,Cyprès,CYPRE,Chamaecyparis lawsonnia,Résineux
+53,Tsuga,TSUGA,Tsuga heterophylla,Résineux
+54,Thuya,THUYA,Thuja plicata,Résineux
+55,Autres résineux,AUT-R,,Résineux
+56,If,IF,Taxus baccata,Résineux
+1100,Toutes essences feuillues,Feuillu,,Feuillu
+1200,Toutes essences résineuses,Résineux,,Résineux
+2100,Autres feuillus,,,Feuillu
+2200,Autres résineux,,,Résineux

@@ -395,3 +395,57 @@ tableau_excel_fa_no_geom <- tableau_excel_fa %>%
 
 write.csv2(tableau_excel_fa_no_geom, out_csv_tableau_excel_fa, row.names = FALSE)
 cat("OK — tableau (sans geom) écrit :", out_csv_tableau_excel_fa, "\n")
+
+
+
+
+
+
+
+
+# =========================================================
+# 8) HDOM (buffer 30 m autour des points) -> stats par typologie
+# =========================================================
+hdom_path <- "C:/Old_Growth_Forest/raster_10m/dendro_hdom_10m.tif"
+r_hdom <- rast(hdom_path) / 100   # cm -> m (si déjà en m, enlève /100)
+
+# CRS OK
+if (!is.na(st_crs(tab_fa)) && !is.na(crs(r_hdom)) && st_crs(tab_fa)$wkt != crs(r_hdom)) {
+  tab_fa <- st_transform(tab_fa, crs(r_hdom))
+}
+
+# buffer 30 m + extract (mean/median + nb pixels)
+buf30 <- st_buffer(tab_fa, 30)
+vbuf  <- vect(buf30)
+
+tab_fa$hdom_mean_m   <- extract(r_hdom, vbuf, fun=mean,   na.rm=TRUE, touches=TRUE)[,2]
+tab_fa$hdom_median_m <- extract(r_hdom, vbuf, fun=median, na.rm=TRUE, touches=TRUE)[,2]
+tab_fa$n_pix_hdom    <- extract(r_hdom, vbuf, fun=function(x) sum(!is.na(x)), touches=TRUE)[,2]
+
+# stats par typologie (sur les plots FA uniquement)
+tab_hdom_typo <- tab_fa %>%
+  st_drop_geometry() %>%
+  filter(is.finite(hdom_mean_m)) %>%
+  group_by(typologie_mature_simplifiee) %>%
+  summarise(
+    n_plots = n(),
+    hdom_mean_m   = mean(hdom_mean_m),
+    hdom_median_m = median(hdom_mean_m),
+    hdom_sd_m     = sd(hdom_mean_m),
+    hdom_se_m     = hdom_sd_m / sqrt(n_plots),
+    .groups="drop"
+  ) %>%
+  arrange(desc(n_plots))
+
+# exports (GitHub outputs)
+write.csv2(st_drop_geometry(tab_fa),
+           file.path(out_dir, "iprfw_tab_FA_avec_HDOM_buffer30m.csv"),
+           row.names = FALSE)
+
+write.csv2(tab_hdom_typo,
+           file.path(out_dir, "iprfw_HDOM_stats_par_typologie_FA_buffer30m.csv"),
+           row.names = FALSE)
+
+tab_hdom_typo
+
+
