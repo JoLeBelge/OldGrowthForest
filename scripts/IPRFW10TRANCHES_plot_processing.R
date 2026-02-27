@@ -402,18 +402,23 @@ tab_fa$hdom_mean_m   <- extract(r_hdom, vbuf, fun=mean,   na.rm=TRUE, touches=TR
 tab_fa$hdom_median_m <- extract(r_hdom, vbuf, fun=median, na.rm=TRUE, touches=TRUE)[,2]
 tab_fa$n_pix_hdom    <- extract(r_hdom, vbuf, fun=function(x) sum(!is.na(x)), touches=TRUE)[,2]
 
+
 tab_hdom_typo <- tab_fa %>%
   st_drop_geometry() %>%
   filter(is.finite(hdom_mean_m)) %>%
   group_by(typologie_mature_simplifiee) %>%
   summarise(
-    n_plots = n(),
-    hdom_mean_m   = mean(hdom_mean_m),
-    hdom_median_m = median(hdom_mean_m),
-    hdom_sd_m     = sd(hdom_mean_m),
-    hdom_se_m     = hdom_sd_m / sqrt(n_plots),
-    .groups="drop"
-  ) %>% arrange(desc(n_plots))
+    n_plots      = n(),
+    hdom_mean    = mean(hdom_mean_m),
+    hdom_median  = median(hdom_mean_m),
+    hdom_sd      = sd(hdom_mean_m),
+    hdom_se      = hdom_sd / sqrt(n_plots),
+    hdom_min     = min(hdom_mean_m),
+    hdom_max     = max(hdom_mean_m),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_plots))
+
 
 write.csv2(st_drop_geometry(tab_fa),
            file.path(out_dir, "iprfw_tab_FA_avec_HDOM_buffer18m.csv"),
@@ -424,3 +429,4 @@ write.csv2(tab_hdom_typo,
            row.names=FALSE)
 
 cat("OK — sorties écrites dans :", out_dir, "\n")
+

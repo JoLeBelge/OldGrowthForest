@@ -62,14 +62,18 @@ stats_hdom_typo <- tab_hdom_plot_typo %>%
   group_by(typologie) %>%
   summarise(
     n_plots = n(),
-    hdom_mean_m   = mean(hdom_mean_m, na.rm = TRUE),
-    hdom_median_m = median(hdom_mean_m, na.rm = TRUE),
-    hdom_sd_m     = sd(hdom_mean_m, na.rm = TRUE),
+    hdom_mean   = mean(hdom_mean_m, na.rm = TRUE),
+    hdom_median = median(hdom_mean_m, na.rm = TRUE),
+    hdom_sd     = sd(hdom_mean_m, na.rm = TRUE),
+    hdom_se     = hdom_sd / sqrt(n_plots),
+    hdom_min    = min(hdom_mean_m, na.rm = TRUE),
+    hdom_max    = max(hdom_mean_m, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   arrange(desc(n_plots))
 
-# --- exports ---
+
+
 write.csv2(tab_hdom_plot_typo, file.path(out_dir, "hdom_par_parcelle_avec_typologie.csv"), row.names = FALSE)
 write.csv2(stats_hdom_typo,    file.path(out_dir, "hdom_stats_par_typologie_parcelle.csv"), row.names = FALSE)
 
