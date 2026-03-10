@@ -50,3 +50,8 @@ im1 - mean( im1b1N5x5, im1b2N5x5, im1b3N5x5 )
 
 gdal raster calc -i "HDOM=dendro_hdom_10m.tif" -i "CDOM=dendro_cdom_maxConv7x7.tif" -i "COMPO=compo_all_sp10m.tif" -i "FA=FA.tif" --calc "FA != 1 ? 1 : (COMPO == 4 || COMPO == 5 || COMPO== 7 || COMPO== 9) ? 2 : (CDOM!=255 && CDOM>150 && HDOM !=255 && HDOM > 20) ? 4 : 3 "  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o preCartoOGF_CDOM150_conv7x7.tif
 
+
+nouvelle carte d'ancienneté des forêts- 2026 02 05 - on garde les forêts qui sont présentent depuis la carde du dépot de la guerre.
+
+gdal vector rasterize --ot Byte --extent 42250,21170,295170,167700 --crs "EPSG:31370" --overwrite --resolution 10,10 --where "(D_L_G < 6 OR UR<5) AND resin!=2" --co "COMPRESS=DEFLATE" --progress FA_20190920.gpkg FA_DLG.tif
+
