@@ -6,6 +6,7 @@ library("readxl")
 library(dplyr)
 require("purrr")
 require("magrittr")
+require("ggplot2")
 
 basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 # Léa: ici tu change la ligne et tu met ton répertoire à toi
@@ -330,4 +331,64 @@ melted <- melt(dw)
 boxplot(data=melted, value~variable, ylim=c(0,200))
 summary(dw)
 
-./carteApt --outils 1 --gpkg_layer "centre_placettes" --gpkg "/home/jo/Téléchargements/ogf.gpkg" --layerCode dendro_cdom --pathBD "/home/jo/Documents/carteApt/GIS/dendro202601/aptitudeEssDB.db"
+./carteApt --outils 1 --gpkg "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots/data/ogf_gnss_bl72.gpkg" --layerCode dendro_cdom_202602 --layerCode dendro_cdom --pathBD "/home/jo/Documents/carteApt/GIS/dendro202601/aptitudeEssDB.db"
+
+# graphique d'évolution de l'erreur standard pour l'estimation du bois mort, avec basal area pour comparaison
+vars <-c("vol_wood_debris_LIS","vol_wood_debris_FAS","vol_dead_standing", "basal_area_alive")
+first=T
+result=NULL
+for (i in 1:100){
+    s<-sample(nrow(dendro),50,replace=F)
+    #sds <- dendro[s,] %>% summarise(across(any_of(vars), list(mean = mean, standard_error= standard_error), .names = "{.col}_{.fn}"))
+    sds <- data.frame(matrix(0,ncol=length(vars),nrow=1, dimnames=list(NULL,vars)))
+    for (var in vars){
+      #sds[var] <- sd(dendro[s,var])/sqrt(i)
+      sds[var] <- 100*sd(dendro[s,var])/(sqrt(i)*mean(dendro[s,var]))
+    }
+    sds %<>% mutate(nUE=i)
+    if (first){
+      result=sds
+      first=FALSE
+    } else {
+      result=rbind(result,sds)
+    }
+}
+
+plot(result$nUE,result$vol_wood_debris_FAS, type="l", col="grey30",lwd=2, ylim=c(0,120), xlab="nombre de placettes", ylab="erreur standard relative (sd(x)/(sqrt(n)*mean(x))")
+lines(result$nUE,result$vol_wood_debris_LIS, col="grey80",lwd=2)
+#lines(result$nUE,result$vol_dead_standing, col="forestgreen",lwd=2)
+lines(result$nUE,result$basal_area_alive, col="forestgreen",lwd=2)
+
+# graphique de répartition des tiges par grosseurs (STRUCTURE), à l'échelle des peuplements
+# 1) fusion de la table cohorte et de la table arbre
+# il y a des zéro dans la colonne nombre, une des encodeuses à cru que c'était obligatoire d'encoder...
+cohorte2arbre <- cohorte %>% filter(nombre>0) %>% mutate(fe=nombre*feA3) %>% select(fe,circ,key_ue_cols[1],key_ue_cols[2]) 
+arbreEtco <-  rbind(arbre %>% filter(statut==1) %>% select(fe,circ,key_ue_cols[1],key_ue_cols[2]),cohorte2arbre)
+arbreEtco %<>% mutate(class_gross = cut_width(circ, 40)) 
+arbreByClass <- arbreEtco %>% group_by(class_gross,ues_id_ogf,ues_id_ue) %>%  summarise(nha1=sum(fe),gha1=sum((circ/100)^2*fe/(4*pi)))
+arbreByClassByOGF <- arbreByClass  %>% group_by(class_gross,ues_id_ogf) %>%  summarise(nha=mean(nha1),gha=mean(gha1))
+#check <- arbreByClass %>% group_by(ues_id_ogf,ues_id_ue) %>%  summarise(nha=sum(nha1),gha=sum(gha1))
+# summary(check$gha)
+ogf_m <- dbReadTable(db ,"ogf_meta")
+arbreByClassByOGF <- merge(arbreByClassByOGF,ogf_m, by=c("ues_id_ogf")) 
+arbreByClassByOGF %<>% mutate(nom2=paste0(nom_court,"-",ues_id_ogf))
+
+p1 <- arbreByClassByOGF %>%
+  ggplot( aes(x=class_gross, y=nha)) +  geom_bar(stat="identity") + facet_wrap(~nom2) +
+  xlab("circonférence [cm]") +
+  ylab("nha [-/ha]")
+p2 <- arbreByClassByOGF %>%
+  ggplot( aes(x=class_gross, y=gha)) +  geom_bar(stat="identity") + facet_wrap(~nom2) +
+  xlab("circonférence [cm]") +
+  ylab("gha [m2/ha]")
+
+require("ggh4x")
+levels(arbreByClassByOGF$class_gross) <- c((1:12)*40)
+p4 <- arbreByClassByOGF %>%
+  ggplot( aes(x=class_gross, y=gha)) +  geom_bar(stat="identity") + facet_wrap2(~ nom2,remove_labels=F) +
+  xlab("circonférence [cm]") +
+  ylab("gha [m2/ha]") + theme(axis.text.x = element_text(size=4))
+png("/home/jo/Documents/OGF/out/structure.png", width = 7.75, height = 5.75, res = 300, units = "in")
+plot(p4)
+dev.off()
+
