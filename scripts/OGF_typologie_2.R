@@ -14,7 +14,7 @@ chemin_bd <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all
 # ----------------------------
 # 1) Seuils
 # ----------------------------
-seuil_pur   <- 66.7  # IPRFW
+seuil_pur   <- 66.7
 seuil_autre <- 50
 seuil_dom   <- 50
 
@@ -50,7 +50,7 @@ parser_essmaj <- function(x) {
 }
 
 # ----------------------------
-# 4) Typologie mature (ancienne) - inchangée
+# 4) Typologie mature (ancienne)
 # ----------------------------
 typologie_une_ligne <- function(code1, p1, code2, p2) {
   code1 <- str_trim(ifelse(is.na(code1), "", code1))
@@ -87,7 +87,7 @@ typologie_une_ligne <- function(code1, p1, code2, p2) {
 }
 
 # ----------------------------
-# 4bis) Typologie mature simplifiée (nouvelle)
+# 4bis) Typologie mature simplifiée
 # ----------------------------
 typologie_mature_simplifiee_une_ligne <- function(code1, p1, code2, p2) {
   code1 <- str_trim(ifelse(is.na(code1), "", code1))
@@ -125,7 +125,6 @@ arbre <- dbReadTable(con, "arbre")
 
 key <- c("ues_id_ogf", "ues_id_ue")
 
-# --- sécurité : clé unique dans dendro_plot ---
 dup_key <- dendro_plot_db %>% count(across(all_of(key))) %>% filter(n > 1)
 if (nrow(dup_key) > 0) {
   stop("dendro_plot contient des doublons sur (ues_id_ogf, ues_id_ue). Corrige avant update.")
@@ -161,7 +160,6 @@ trees_top <- arbre %>%
   filter(gha_dom > 0) %>%
   ungroup()
 
-
 codes_exclure <- c("CR","MZ","DO")
 
 ue_exclues <- trees_top %>%
@@ -196,7 +194,7 @@ essmaj_mature <- gha_ess_mature %>%
   )
 
 # =========================================================
-# 7) Plus gros arbre (vivant) par UE : CIR_max + ess_max
+# 7) Plus gros arbre vivant par UE
 # =========================================================
 max_tree <- arbre %>%
   filter(statut == 1, !is.na(circ), circ > 0, !is.na(ess), ess != "") %>%
@@ -206,7 +204,7 @@ max_tree <- arbre %>%
   ungroup()
 
 # =========================================================
-# 8) Construire une table UPDATE (1 ligne par UE, clés uniques)
+# 8) Table update
 # =========================================================
 update_tbl <- dendro_plot_db %>%
   select(all_of(key)) %>%
@@ -219,7 +217,6 @@ update_tbl <- dendro_plot_db %>%
   ) %>%
   select(-exclu)
 
-# typologies sur essmaj_mature
 parsed_m <- parser_essmaj(update_tbl$essmaj_mature)
 
 update_tbl$typologie_mature <- mapply(
@@ -237,15 +234,15 @@ update_tbl$typologie_mature[wh_na] <- NA
 update_tbl$typologie_mature_simplifiee[wh_na] <- NA
 
 # =========================================================
-# 9) ALTER TABLE si besoin + UPDATE SQL via table temporaire (par clés)
+# 9) ALTER TABLE + UPDATE
 # =========================================================
 cols <- dbGetQuery(con, "PRAGMA table_info(dendro_plot);")$name
-if (!"essmaj_mature" %in% cols)                 dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN essmaj_mature TEXT;")
-if (!"typologie_mature" %in% cols)              dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN typologie_mature TEXT;")
-if (!"typologie_mature_simplifiee" %in% cols)   dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN typologie_mature_simplifiee TEXT;")
-if (!"valid_mature" %in% cols)                  dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN valid_mature INTEGER;")
-if (!"CIR_max" %in% cols)                       dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN CIR_max REAL;")
-if (!"ess_max" %in% cols)                       dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN ess_max TEXT;")
+if (!"essmaj_mature" %in% cols)               dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN essmaj_mature TEXT;")
+if (!"typologie_mature" %in% cols)            dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN typologie_mature TEXT;")
+if (!"typologie_mature_simplifiee" %in% cols) dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN typologie_mature_simplifiee TEXT;")
+if (!"valid_mature" %in% cols)                dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN valid_mature INTEGER;")
+if (!"CIR_max" %in% cols)                     dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN CIR_max REAL;")
+if (!"ess_max" %in% cols)                     dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN ess_max TEXT;")
 
 dbWriteTable(con, "tmp_update_mature", update_tbl, overwrite = TRUE)
 
@@ -273,10 +270,20 @@ dbExecute(con, "
 ")
 
 dbExecute(con, "DROP TABLE tmp_update_mature;")
+
+# =========================================================
+# 10) RELECTURE TABLE MISE A JOUR POUR ANALYSES
+# =========================================================
+plots_ogf <- dbReadTable(con, "dendro_plot") %>%
+  filter(valid_mature == 1) %>%
+  mutate(
+    bm_sol_total = vol_wood_debris_FAS + vol_wood_debris_LIS
+  )
+
 dbDisconnect(con)
 
 # =========================================================
-# 10) Contrôles rapides (sans relire la DB, on check update_tbl)
+# 11) CONTROLES RAPIDES
 # =========================================================
 update_tbl %>% count(valid_mature, sort = TRUE)
 update_tbl %>% count(typologie_mature, sort = TRUE)
@@ -284,3 +291,486 @@ update_tbl %>% count(typologie_mature_simplifiee, sort = TRUE)
 update_tbl %>% count(ess_max, sort = TRUE)
 
 head(update_tbl)
+
+# =========================================================
+# 12) ANALYSES BOIS MORT
+# =========================================================
+
+se <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) <= 1) return(NA_real_)
+  sd(x) / sqrt(length(x))
+}
+
+# --- Toutes les placettes
+indicateurs_ogf <- plots_ogf %>%
+  summarise(
+    n_plots = n(),
+    
+    bm_total_moy = mean(vol_deadw, na.rm = TRUE),
+    bm_total_med = median(vol_deadw, na.rm = TRUE),
+    bm_total_se  = se(vol_deadw),
+    
+    bm_sur_pied_moy = mean(vol_dead_standing, na.rm = TRUE),
+    bm_sur_pied_med = median(vol_dead_standing, na.rm = TRUE),
+    bm_sur_pied_se  = se(vol_dead_standing),
+    
+    bm_sol_FAS_moy = mean(vol_wood_debris_FAS, na.rm = TRUE),
+    bm_sol_FAS_med = median(vol_wood_debris_FAS, na.rm = TRUE),
+    bm_sol_FAS_se  = se(vol_wood_debris_FAS),
+    
+    bm_sol_LIS_moy = mean(vol_wood_debris_LIS, na.rm = TRUE),
+    bm_sol_LIS_med = median(vol_wood_debris_LIS, na.rm = TRUE),
+    bm_sol_LIS_se  = se(vol_wood_debris_LIS),
+    
+    bm_sol_total_moy = mean(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_med = median(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_se  = se(bm_sol_total),
+    
+    pct_plots_sans_bois_mort = 100 * mean(vol_deadw == 0, na.rm = TRUE)
+  )
+
+indicateurs_ogf
+
+# --- Sans placettes à 0
+indicateurs_ogf_no0 <- plots_ogf %>%
+  filter(vol_deadw > 0) %>%
+  summarise(
+    n_plots = n(),
+    
+    bm_total_moy = mean(vol_deadw, na.rm = TRUE),
+    bm_total_med = median(vol_deadw, na.rm = TRUE),
+    bm_total_se  = se(vol_deadw),
+    
+    bm_sur_pied_moy = mean(vol_dead_standing, na.rm = TRUE),
+    bm_sur_pied_med = median(vol_dead_standing, na.rm = TRUE),
+    bm_sur_pied_se  = se(vol_dead_standing),
+    
+    bm_sol_FAS_moy = mean(vol_wood_debris_FAS, na.rm = TRUE),
+    bm_sol_FAS_med = median(vol_wood_debris_FAS, na.rm = TRUE),
+    bm_sol_FAS_se  = se(vol_wood_debris_FAS),
+    
+    bm_sol_LIS_moy = mean(vol_wood_debris_LIS, na.rm = TRUE),
+    bm_sol_LIS_med = median(vol_wood_debris_LIS, na.rm = TRUE),
+    bm_sol_LIS_se  = se(vol_wood_debris_LIS),
+    
+    bm_sol_total_moy = mean(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_med = median(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_se  = se(bm_sol_total)
+  )
+
+indicateurs_ogf_no0
+
+# --- Par typologie, sans placettes à 0
+indicateurs_ogf_par_typologie_no0 <- plots_ogf %>%
+  filter(vol_deadw > 0) %>%
+  group_by(typologie_mature_simplifiee) %>%
+  summarise(
+    n_plots = n(),
+    
+    bm_total_moy = mean(vol_deadw, na.rm = TRUE),
+    bm_total_med = median(vol_deadw, na.rm = TRUE),
+    bm_total_se  = se(vol_deadw),
+    
+    bm_sur_pied_moy = mean(vol_dead_standing, na.rm = TRUE),
+    bm_sur_pied_med = median(vol_dead_standing, na.rm = TRUE),
+    bm_sur_pied_se  = se(vol_dead_standing),
+    
+    bm_sol_FAS_moy = mean(vol_wood_debris_FAS, na.rm = TRUE),
+    bm_sol_FAS_med = median(vol_wood_debris_FAS, na.rm = TRUE),
+    bm_sol_FAS_se  = se(vol_wood_debris_FAS),
+    
+    bm_sol_LIS_moy = mean(vol_wood_debris_LIS, na.rm = TRUE),
+    bm_sol_LIS_med = median(vol_wood_debris_LIS, na.rm = TRUE),
+    bm_sol_LIS_se  = se(vol_wood_debris_LIS),
+    
+    bm_sol_total_moy = mean(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_med = median(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_se  = se(bm_sol_total),
+    
+    .groups = "drop"
+  ) %>%
+  arrange(desc(bm_total_moy))
+
+indicateurs_ogf_par_typologie_no0
+
+# =========================================================
+# 13) TABLEAUX "SLIDE READY"
+# =========================================================
+
+tableau_ogf_slide <- indicateurs_ogf %>%
+  transmute(
+    zone = "OGF terrain",
+    n = n_plots,
+    bm_total_moy = round(bm_total_moy, 1),
+    mediane = round(bm_total_med, 1),
+    se = round(bm_total_se, 1),
+    bm_sur_pied = round(bm_sur_pied_moy, 1),
+    bm_au_sol = round(bm_sol_total_moy, 1),
+    pct_sans_bm = round(pct_plots_sans_bois_mort, 1)
+  )
+
+tableau_ogf_slide
+
+tableau_ogf_slide_no0 <- indicateurs_ogf_no0 %>%
+  transmute(
+    zone = "OGF terrain (BM > 0)",
+    n = n_plots,
+    bm_total_moy = round(bm_total_moy, 1),
+    mediane = round(bm_total_med, 1),
+    se = round(bm_total_se, 1),
+    bm_sur_pied = round(bm_sur_pied_moy, 1),
+    bm_au_sol = round(bm_sol_total_moy, 1)
+  )
+
+tableau_ogf_slide_no0
+
+tableau_ogf_typo_slide <- indicateurs_ogf_par_typologie_no0 %>%
+  transmute(
+    typologie = typologie_mature_simplifiee,
+    n = n_plots,
+    bm_total_moy = round(bm_total_moy, 1),
+    mediane = round(bm_total_med, 1),
+    se = round(bm_total_se, 1),
+    bm_sur_pied = round(bm_sur_pied_moy, 1),
+    bm_au_sol = round(bm_sol_total_moy, 1)
+  )
+
+tableau_ogf_typo_slide
+
+# =========================================================
+# 14) CORRELATION FAS vs LIS
+# =========================================================
+
+test_cor_fas_lis_pearson <- cor.test(
+  plots_ogf$vol_wood_debris_FAS,
+  plots_ogf$vol_wood_debris_LIS,
+  use = "complete.obs",
+  method = "pearson"
+)
+
+test_cor_fas_lis_spearman <- cor.test(
+  plots_ogf$vol_wood_debris_FAS,
+  plots_ogf$vol_wood_debris_LIS,
+  use = "complete.obs",
+  method = "spearman"
+)
+
+test_cor_fas_lis_pearson
+test_cor_fas_lis_spearman
+
+
+
+# =========================================================
+# 12) DESCRIPTION DES DONNEES TERRAIN OGF
+# =========================================================
+
+# Sécurité : recalcul de quelques variables utiles
+plots_ogf <- plots_ogf %>%
+  mutate(
+    bm_sur_pied = vol_dead_standing,
+    bm_sol_fas = vol_wood_debris_FAS,
+    bm_sol_lis = vol_wood_debris_LIS,
+    bm_sol_total = vol_wood_debris_FAS + vol_wood_debris_LIS,
+    ratio_bm_vivant = ifelse(!is.na(vol_alive) & vol_alive > 0, vol_deadw / vol_alive, NA_real_),
+    pct_bm_vivant = ifelse(!is.na(vol_alive) & vol_alive > 0, 100 * vol_deadw / vol_alive, NA_real_)
+  )
+
+# ---------------------------------------------------------
+# 12.1 Tableau général complet
+# ---------------------------------------------------------
+
+description_ogf_globale <- plots_ogf %>%
+  summarise(
+    n_placettes = n(),
+    
+    cdom_moy = mean(cdom, na.rm = TRUE),
+    cdom_med = median(cdom, na.rm = TRUE),
+    cdom_se  = se(cdom),
+    
+    CIR_max_moy = mean(CIR_max, na.rm = TRUE),
+    CIR_max_med = median(CIR_max, na.rm = TRUE),
+    CIR_max_se  = se(CIR_max),
+    
+    vol_vivant_moy = mean(vol_alive, na.rm = TRUE),
+    vol_vivant_med = median(vol_alive, na.rm = TRUE),
+    vol_vivant_se  = se(vol_alive),
+    
+    vol_mort_moy = mean(vol_deadw, na.rm = TRUE),
+    vol_mort_med = median(vol_deadw, na.rm = TRUE),
+    vol_mort_se  = se(vol_deadw),
+    
+    bm_sur_pied_moy = mean(bm_sur_pied, na.rm = TRUE),
+    bm_sur_pied_med = median(bm_sur_pied, na.rm = TRUE),
+    bm_sur_pied_se  = se(bm_sur_pied),
+    
+    bm_sol_fas_moy = mean(bm_sol_fas, na.rm = TRUE),
+    bm_sol_fas_med = median(bm_sol_fas, na.rm = TRUE),
+    bm_sol_fas_se  = se(bm_sol_fas),
+    
+    bm_sol_lis_moy = mean(bm_sol_lis, na.rm = TRUE),
+    bm_sol_lis_med = median(bm_sol_lis, na.rm = TRUE),
+    bm_sol_lis_se  = se(bm_sol_lis),
+    
+    bm_sol_total_moy = mean(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_med = median(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_se  = se(bm_sol_total),
+    
+    pct_bm_vivant_moy = mean(pct_bm_vivant, na.rm = TRUE),
+    pct_bm_vivant_med = median(pct_bm_vivant, na.rm = TRUE),
+    
+    nb_arbres_moy = mean(number_of_trees, na.rm = TRUE),
+    nb_arbres_med = median(number_of_trees, na.rm = TRUE),
+    
+    nb_gros_arbres_moy = mean(number_of_trees_thres120, na.rm = TRUE),
+    nb_gros_arbres_med = median(number_of_trees_thres120, na.rm = TRUE)
+  )
+
+description_ogf_globale
+
+# ---------------------------------------------------------
+# 12.2 Tableau par typologie
+# ---------------------------------------------------------
+
+description_ogf_par_typologie <- plots_ogf %>%
+  group_by(typologie_mature_simplifiee) %>%
+  summarise(
+    n_placettes = n(),
+    
+    cdom_moy = mean(cdom, na.rm = TRUE),
+    cdom_med = median(cdom, na.rm = TRUE),
+    cdom_se  = se(cdom),
+    
+    CIR_max_moy = mean(CIR_max, na.rm = TRUE),
+    CIR_max_med = median(CIR_max, na.rm = TRUE),
+    CIR_max_se  = se(CIR_max),
+    
+    vol_vivant_moy = mean(vol_alive, na.rm = TRUE),
+    vol_vivant_med = median(vol_alive, na.rm = TRUE),
+    vol_vivant_se  = se(vol_alive),
+    
+    vol_mort_moy = mean(vol_deadw, na.rm = TRUE),
+    vol_mort_med = median(vol_deadw, na.rm = TRUE),
+    vol_mort_se  = se(vol_deadw),
+    
+    bm_sur_pied_moy = mean(bm_sur_pied, na.rm = TRUE),
+    bm_sur_pied_med = median(bm_sur_pied, na.rm = TRUE),
+    bm_sur_pied_se  = se(bm_sur_pied),
+    
+    bm_sol_fas_moy = mean(bm_sol_fas, na.rm = TRUE),
+    bm_sol_fas_med = median(bm_sol_fas, na.rm = TRUE),
+    bm_sol_fas_se  = se(bm_sol_fas),
+    
+    bm_sol_lis_moy = mean(bm_sol_lis, na.rm = TRUE),
+    bm_sol_lis_med = median(bm_sol_lis, na.rm = TRUE),
+    bm_sol_lis_se  = se(bm_sol_lis),
+    
+    bm_sol_total_moy = mean(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_med = median(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_se  = se(bm_sol_total),
+    
+    pct_bm_vivant_moy = mean(pct_bm_vivant, na.rm = TRUE),
+    pct_bm_vivant_med = median(pct_bm_vivant, na.rm = TRUE),
+    
+    nb_gros_arbres_moy = mean(number_of_trees_thres120, na.rm = TRUE),
+    nb_gros_arbres_med = median(number_of_trees_thres120, na.rm = TRUE),
+    
+    .groups = "drop"
+  ) %>%
+  arrange(desc(vol_mort_moy))
+
+description_ogf_par_typologie
+
+# ---------------------------------------------------------
+# 12.3 Version "slide-ready" : structure générale
+# ---------------------------------------------------------
+
+tableau_ogf_structure_slide <- description_ogf_globale %>%
+  transmute(
+    Jeu = "Placettes terrain OGF",
+    n = n_placettes,
+    
+    `CDOM moyen` = round(cdom_moy, 1),
+    `CDOM médian` = round(cdom_med, 1),
+    
+    `CIR max moyen` = round(CIR_max_moy, 1),
+    `CIR max médian` = round(CIR_max_med, 1),
+    
+    `Vol. vivant moyen` = round(vol_vivant_moy, 1),
+    `SE vol. vivant` = round(vol_vivant_se, 1),
+    
+    `Vol. mort total moyen` = round(vol_mort_moy, 1),
+    `Vol. mort total médian` = round(vol_mort_med, 1),
+    `SE vol. mort total` = round(vol_mort_se, 1),
+    
+    `% BM / vivant` = round(pct_bm_vivant_moy, 1),
+    
+    `Nb gros arbres moyen` = round(nb_gros_arbres_moy, 1)
+  )
+
+tableau_ogf_structure_slide
+
+# ---------------------------------------------------------
+# 12.4 Version "slide-ready" : décomposition du bois mort
+# ---------------------------------------------------------
+
+tableau_ogf_bm_slide <- description_ogf_globale %>%
+  transmute(
+    Jeu = "Placettes terrain OGF",
+    n = n_placettes,
+    
+    `BM total moyen` = round(vol_mort_moy, 1),
+    `BM total médian` = round(vol_mort_med, 1),
+    
+    `BM sur pied moyen` = round(bm_sur_pied_moy, 1),
+    `SE BM sur pied` = round(bm_sur_pied_se, 1),
+    
+    `BM au sol FAS moyen` = round(bm_sol_fas_moy, 1),
+    `SE BM au sol FAS` = round(bm_sol_fas_se, 1),
+    
+    `BM au sol LIS moyen` = round(bm_sol_lis_moy, 1),
+    `SE BM au sol LIS` = round(bm_sol_lis_se, 1),
+    
+    `BM au sol total moyen` = round(bm_sol_total_moy, 1),
+    `BM au sol total médian` = round(bm_sol_total_med, 1),
+    `SE BM au sol total` = round(bm_sol_total_se, 1)
+  )
+
+tableau_ogf_bm_slide
+
+# ---------------------------------------------------------
+# 12.5 Version "slide-ready" : par typologie
+# ---------------------------------------------------------
+
+tableau_ogf_typologie_slide <- description_ogf_par_typologie %>%
+  transmute(
+    Typologie = typologie_mature_simplifiee,
+    n = n_placettes,
+    
+    `CDOM moy` = round(cdom_moy, 1),
+    `CIR max moy` = round(CIR_max_moy, 1),
+    
+    `Vol. vivant moy` = round(vol_vivant_moy, 1),
+    `Vol. mort total moy` = round(vol_mort_moy, 1),
+    `Vol. mort total médian` = round(vol_mort_med, 1),
+    `SE vol. mort` = round(vol_mort_se, 1),
+    
+    `BM sur pied moy` = round(bm_sur_pied_moy, 1),
+    `BM au sol total moy` = round(bm_sol_total_moy, 1),
+    
+    `% BM / vivant` = round(pct_bm_vivant_moy, 1),
+    `Nb gros arbres moy` = round(nb_gros_arbres_moy, 1)
+  )
+
+tableau_ogf_typologie_slide
+
+# ---------------------------------------------------------
+# 12.6 Export Excel séparé "description terrain"
+# ---------------------------------------------------------
+
+library(openxlsx)
+
+f_out_ogf_desc <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/resultats_description_terrain_ogf.xlsx"
+
+wb_ogf <- createWorkbook()
+
+addWorksheet(wb_ogf, "ogf_global")
+addWorksheet(wb_ogf, "ogf_par_typologie")
+addWorksheet(wb_ogf, "ogf_slide_structure")
+addWorksheet(wb_ogf, "ogf_slide_deadwood")
+addWorksheet(wb_ogf, "ogf_slide_typologie")
+
+writeData(wb_ogf, "ogf_global", description_ogf_globale)
+writeData(wb_ogf, "ogf_par_typologie", description_ogf_par_typologie)
+writeData(wb_ogf, "ogf_slide_structure", tableau_ogf_structure_slide)
+writeData(wb_ogf, "ogf_slide_deadwood", tableau_ogf_bm_slide)
+writeData(wb_ogf, "ogf_slide_typologie", tableau_ogf_typologie_slide)
+
+saveWorkbook(wb_ogf, f_out_ogf_desc, overwrite = TRUE)
+
+
+
+
+
+
+# ---------------------------------------------------------
+# 12.7 Tableau par typologie - toutes les placettes (sans filtre BM > 0)
+# ---------------------------------------------------------
+
+description_ogf_par_typologie_all <- plots_ogf %>%
+  group_by(typologie_mature_simplifiee) %>%
+  summarise(
+    n_placettes = n(),
+    
+    vol_mort_moy = mean(vol_deadw, na.rm = TRUE),
+    vol_mort_med = median(vol_deadw, na.rm = TRUE),
+    vol_mort_se  = se(vol_deadw),
+    
+    bm_sur_pied_moy = mean(bm_sur_pied, na.rm = TRUE),
+    bm_sur_pied_med = median(bm_sur_pied, na.rm = TRUE),
+    bm_sur_pied_se  = se(bm_sur_pied),
+    
+    bm_sol_fas_moy = mean(bm_sol_fas, na.rm = TRUE),
+    bm_sol_fas_med = median(bm_sol_fas, na.rm = TRUE),
+    bm_sol_fas_se  = se(bm_sol_fas),
+    
+    bm_sol_lis_moy = mean(bm_sol_lis, na.rm = TRUE),
+    bm_sol_lis_med = median(bm_sol_lis, na.rm = TRUE),
+    bm_sol_lis_se  = se(bm_sol_lis),
+    
+    bm_sol_total_moy = mean(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_med = median(bm_sol_total, na.rm = TRUE),
+    bm_sol_total_se  = se(bm_sol_total),
+    
+    .groups = "drop"
+  ) %>%
+  arrange(desc(vol_mort_moy))
+
+description_ogf_par_typologie_all
+
+
+# ---------------------------------------------------------
+# Version lisible pour slides
+# ---------------------------------------------------------
+
+tableau_ogf_typologie_all_slide <- description_ogf_par_typologie_all %>%
+  transmute(
+    Typologie = typologie_mature_simplifiee,
+    n = n_placettes,
+    
+    `BM total moyen` = round(vol_mort_moy, 1),
+    `BM total médian` = round(vol_mort_med, 1),
+    `SE BM total` = round(vol_mort_se, 1),
+    
+    `BM sur pied moy` = round(bm_sur_pied_moy, 1),
+    
+    `BM sol FAS moy` = round(bm_sol_fas_moy, 1),
+    `BM sol LIS moy` = round(bm_sol_lis_moy, 1),
+    
+    `BM sol total moy` = round(bm_sol_total_moy, 1),
+    `BM sol total médian` = round(bm_sol_total_med, 1),
+    `SE BM sol total` = round(bm_sol_total_se, 1)
+  )
+
+tableau_ogf_typologie_all_slide
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
