@@ -202,7 +202,7 @@ lLIS <- merge(dt_LIS,ues[,c(key_ue_cols2,"lLIS")],by.x=key_ue_cols, by.y=key_ue_
 dt_LIS$v <- 10000 * ((pi^2)/(8*(3*lLIS$lLIS)))*(dt_LIS$circ/(pi*100))^2
 
 # les noms des variables dendro se rapprochent autant que ce peux de celles utilisées par Vandekerkhove
-dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_thres120=sum(fe),vol_alive_thres120 = sum(v_tc1*fe), basal_area_alive_thres120=sum((circ/100)^2*fe/(4*pi)))
+dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_thres120=sum(fe),vol_alive_thres120 = sum(v_tc1*fe), basal_area_alive_thres120=sum((circ/100)^2*fe/(4*pi)),nha_tgb_210=sum((circ>210)* fe))
 dendro_arbre_mort <- arbre[arbre$statut==2,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_dead_standing = sum((v)*fe), basal_area_dead=sum((circ/100)^2*fe/(4*pi)))
 dendro_cohorte <- cohorte %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_co=sum(nombre*feA3), vol_alive_co = sum(v*feA3), basal_area_alive_co=sum(nombre*(circ/100)^2*feA3/(4*pi)))
 dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4))
@@ -290,7 +290,7 @@ dendro_cdom <- plots_trees_coppices %>% mutate(
 dendro <- merge(dendro,dendro_cdom,by.x=key_ue_cols , all=F)
 
 # réordonner les colonnes pour plus de logique et de lisibilité
-colOrder <- c("ues_id_ogf","ues_id_ue","essmaj","number_of_trees_co","number_of_trees_thres120","number_of_trees","basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead","vol_alive_co","vol_alive_thres120","vol_alive","vol_dead_standing","vol_dead_standing_ratio","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom")
+colOrder <- c("ues_id_ogf","ues_id_ue","essmaj","number_of_trees_co","number_of_trees_thres120","number_of_trees","basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead","vol_alive_co","vol_alive_thres120","vol_alive","vol_dead_standing","vol_dead_standing_ratio","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom", "nha_tgb_210")
 dendro <- dendro[,colOrder]
 # ajout mesure gha par relascope pour comparaison avec gha calculé
 dendro <- merge(dendro,ues[,c(key_ue_cols2,"gha_relascope")],by.x=key_ue_cols, by.y=key_ue_cols2 , all=F)
