@@ -430,3 +430,4 @@ write.csv2(tab_hdom_typo,
 
 cat("OK — sorties écrites dans :", out_dir, "\n")
 
+j'ai une b'
