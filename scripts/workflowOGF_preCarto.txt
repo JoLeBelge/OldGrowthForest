@@ -55,3 +55,13 @@ nouvelle carte d'ancienneté des forêts- 2026 02 05 - on garde les forêts qui 
 
 gdal vector rasterize --ot Byte --extent 42250,21170,295170,167700 --crs "EPSG:31370" --overwrite --resolution 10,10 --where "(D_L_G < 6 OR UR<5) AND resin!=2" --co "COMPRESS=DEFLATE" --progress FA_20190920.gpkg FA_DLG.tif
 
+2026 03 24 ; je teste si la structure peux améliorer la préCarto des OGF en complément du seuil en hauteur dominante
+1) alignement des deux rasters
+
+gdalwarp -t_srs EPSG:31370 -te 42250 21170 295170 167700 -overwrite -tr 10 10 -co "COMPRESS=DEFLATE" prediction_nha_tgb210_20260324_fixedHmean.tif structure_nha_tgb.tif
+
+gdal raster calc -i "ogf=STATUS_MIX_q70_DLG.tif" -i "tgb=structure_nha_tgb.tif" --calc "(ogf==1 && tgb >= 10) ? 1 : (ogf==1 && tgb < 10) ? 2 : 0"  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o precartoOGF_with_structure1.tif
+
+Ce n'est pas magique évidemment..
+
+

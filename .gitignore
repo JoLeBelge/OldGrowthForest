@@ -1,4 +1,5 @@
 *.Rhistory
+*.RData
 scripts/OGF_remoteSensing2.R
 lea/*
 /Carto_OGF_Lea/outputs_reboot
