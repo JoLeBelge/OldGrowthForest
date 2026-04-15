@@ -205,7 +205,7 @@ dt_LIS$v <- 10000 * ((pi^2)/(8*(3*lLIS$lLIS)))*(dt_LIS$circ/(pi*100))^2
 dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_thres120=sum(fe),vol_alive_thres120 = sum(v_tc1*fe), basal_area_alive_thres120=sum((circ/100)^2*fe/(4*pi)),nha_tgb_210=sum((circ>210)* fe))
 dendro_arbre_mort <- arbre[arbre$statut==2,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_dead_standing = sum((v)*fe), basal_area_dead=sum((circ/100)^2*fe/(4*pi)))
 dendro_cohorte <- cohorte %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_co=sum(nombre*feA3), vol_alive_co = sum(v*feA3), basal_area_alive_co=sum(nombre*(circ/100)^2*feA3/(4*pi)))
-dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4))
+dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4),nha_cwd_90_150=sum((max(circ1,circ2)>90 & max(circ1,circ2) <150) * feA4))
 dendro_LIS <- dt_LIS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_LIS = sum(v))
 
 #création matrice ogf x essence pour proportion de chaque essence dans l'UE
