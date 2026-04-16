@@ -1,5 +1,6 @@
 # =========================================================
 # OGF_all.db : AJOUT typologie_mature_simplifiee (SAFE UPDATE par clés)
+# + récupération de nha_tgb depuis dendro_stand
 # - ne modifie PAS le nombre de lignes de dendro_plot
 # - update par (ues_id_ogf, ues_id_ue), pas par rowid
 # =========================================================
@@ -8,6 +9,7 @@ library(DBI)
 library(RSQLite)
 library(dplyr)
 library(stringr)
+library(openxlsx)
 
 chemin_bd <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all.db"
 
@@ -46,7 +48,7 @@ parser_essmaj <- function(x) {
   p1[is.na(p1)] <- 0
   p2[is.na(p2)] <- 0
   
-  tibble(code1=code1, p1=p1, code2=code2, p2=p2)
+  tibble(code1 = code1, p1 = p1, code2 = code2, p2 = p2)
 }
 
 # ----------------------------
@@ -62,10 +64,10 @@ typologie_une_ligne <- function(code1, p1, code2, p2) {
   
   total_chene  <- ifelse(code1 %in% codes_chene, p1, 0) + ifelse(code2 %in% codes_chene, p2, 0)
   total_erable <- ifelse(code1 %in% codes_erable, p1, 0) + ifelse(code2 %in% codes_erable, p2, 0)
-  total_he     <- ifelse(code1=="HE", p1, 0) + ifelse(code2=="HE", p2, 0)
-  total_fr     <- ifelse(code1=="FR", p1, 0) + ifelse(code2=="FR", p2, 0)
-  total_mr     <- ifelse(code1=="MR", p1, 0) + ifelse(code2=="MR", p2, 0)
-  total_cr     <- ifelse(code1=="CR", p1, 0) + ifelse(code2=="CR", p2, 0)
+  total_he     <- ifelse(code1 == "HE", p1, 0) + ifelse(code2 == "HE", p2, 0)
+  total_fr     <- ifelse(code1 == "FR", p1, 0) + ifelse(code2 == "FR", p2, 0)
+  total_mr     <- ifelse(code1 == "MR", p1, 0) + ifelse(code2 == "MR", p2, 0)
+  total_cr     <- ifelse(code1 == "CR", p1, 0) + ifelse(code2 == "CR", p2, 0)
   
   if (total_chene  >= seuil_pur) return("Chenaie")
   if (total_he     >= seuil_pur) return("Hetraie")
@@ -95,14 +97,14 @@ typologie_mature_simplifiee_une_ligne <- function(code1, p1, code2, p2) {
   p1 <- ifelse(is.na(p1), 0, p1)
   p2 <- ifelse(is.na(p2), 0, p2)
   
-  nobles_visibles <- ifelse(code1 %in% codes_nobles, p1, 0) + ifelse(code2 %in% codes_nobles, p2, 0)
+  nobles_visibles   <- ifelse(code1 %in% codes_nobles, p1, 0) + ifelse(code2 %in% codes_nobles, p2, 0)
   feuillus_visibles <- ifelse(code1 %in% codes_feuillus, p1, 0) + ifelse(code2 %in% codes_feuillus, p2, 0)
   
   if (p1 >= seuil_dom) {
-    if (code1 == "HE")            return("Hetraie")
-    if (code1 %in% codes_chene)   return("Chenaie")
-    if (code1 == "FR")            return("Frenaie")
-    if (code1 %in% codes_erable)  return("Erabliere")
+    if (code1 == "HE")           return("Hetraie")
+    if (code1 %in% codes_chene)  return("Chenaie")
+    if (code1 == "FR")           return("Frenaie")
+    if (code1 %in% codes_erable) return("Erabliere")
     
     if (code1 %in% codes_nobles)   return("Autres feuillus nobles")
     if (code1 %in% codes_feuillus) return("Autres peuplements feuillus")
@@ -115,23 +117,64 @@ typologie_mature_simplifiee_une_ligne <- function(code1, p1, code2, p2) {
   "Peuplement melange"
 }
 
+# ----------------------------
+# 5) Fonction SE
+# ----------------------------
+se <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) <= 1) return(NA_real_)
+  sd(x) / sqrt(length(x))
+}
+
 # =========================================================
-# 5) Connexion + lecture
+# 6) Connexion + lecture
 # =========================================================
 con <- dbConnect(RSQLite::SQLite(), chemin_bd)
 
-dendro_plot_db <- dbReadTable(con, "dendro_plot")
-arbre <- dbReadTable(con, "arbre")
+dendro_plot_db  <- dbReadTable(con, "dendro_plot")
+arbre           <- dbReadTable(con, "arbre")
+dendro_stand_raw <- dbReadTable(con, "dendro_stand")
 
+# clé utilisée pour toute la logique dendro_plot / arbre
 key <- c("ues_id_ogf", "ues_id_ue")
 
-dup_key <- dendro_plot_db %>% count(across(all_of(key))) %>% filter(n > 1)
+dup_key <- dendro_plot_db %>%
+  count(across(all_of(key))) %>%
+  filter(n > 1)
+
 if (nrow(dup_key) > 0) {
   stop("dendro_plot contient des doublons sur (ues_id_ogf, ues_id_ue). Corrige avant update.")
 }
 
+# vérification présence nha_tgb dans dendro_stand
+if (!"nha_tgb" %in% names(dendro_stand_raw)) {
+  stop("La colonne nha_tgb n'existe pas dans dendro_stand.")
+}
+
+# détection automatique des colonnes ID communes entre dendro_plot et dendro_stand
+id_communes <- intersect(names(dendro_plot_db), names(dendro_stand_raw))
+id_communes <- id_communes[grepl("(^ues_id|^id_)", id_communes)]
+
+if (length(id_communes) == 0) {
+  stop("Aucune colonne ID commune détectée entre dendro_plot et dendro_stand.")
+}
+
+message("Colonnes utilisées pour la jointure dendro_plot <-> dendro_stand : ",
+        paste(id_communes, collapse = ", "))
+
+dendro_stand <- dendro_stand_raw %>%
+  select(all_of(id_communes), nha_tgb)
+
+dup_key_stand <- dendro_stand %>%
+  count(across(all_of(id_communes))) %>%
+  filter(n > 1)
+
+if (nrow(dup_key_stand) > 0) {
+  stop("dendro_stand contient des doublons sur les colonnes communes de jointure.")
+}
+
 # =========================================================
-# 6) ESSMAJ mature (top 40 tiges/ha) + exclusions
+# 7) ESSMAJ mature (top 40 tiges/ha) + exclusions
 # =========================================================
 n_tree_essMatureMaj <- 40
 
@@ -155,12 +198,12 @@ trees_top <- arbre %>%
       is.na(whup2) ~ fe,
       TRUE ~ 0
     ),
-    gha_dom = ((circ/100)^2) * fext_ha2 / (4*pi)
+    gha_dom = ((circ / 100)^2) * fext_ha2 / (4 * pi)
   ) %>%
   filter(gha_dom > 0) %>%
   ungroup()
 
-codes_exclure <- c("CR","MZ","DO")
+codes_exclure <- c("CR", "MZ", "DO")
 
 ue_exclues <- trees_top %>%
   filter(ess %in% codes_exclure) %>%
@@ -194,7 +237,7 @@ essmaj_mature <- gha_ess_mature %>%
   )
 
 # =========================================================
-# 7) Plus gros arbre vivant par UE
+# 8) Plus gros arbre vivant par UE
 # =========================================================
 max_tree <- arbre %>%
   filter(statut == 1, !is.na(circ), circ > 0, !is.na(ess), ess != "") %>%
@@ -204,7 +247,7 @@ max_tree <- arbre %>%
   ungroup()
 
 # =========================================================
-# 8) Table update
+# 9) Table update
 # =========================================================
 update_tbl <- dendro_plot_db %>%
   select(all_of(key)) %>%
@@ -234,7 +277,7 @@ update_tbl$typologie_mature[wh_na] <- NA
 update_tbl$typologie_mature_simplifiee[wh_na] <- NA
 
 # =========================================================
-# 9) ALTER TABLE + UPDATE
+# 10) ALTER TABLE + UPDATE
 # =========================================================
 cols <- dbGetQuery(con, "PRAGMA table_info(dendro_plot);")$name
 if (!"essmaj_mature" %in% cols)               dbExecute(con, "ALTER TABLE dendro_plot ADD COLUMN essmaj_mature TEXT;")
@@ -272,9 +315,11 @@ dbExecute(con, "
 dbExecute(con, "DROP TABLE tmp_update_mature;")
 
 # =========================================================
-# 10) RELECTURE TABLE MISE A JOUR POUR ANALYSES
+# 11) RELECTURE TABLE MISE A JOUR POUR ANALYSES
+# + ajout de nha_tgb depuis dendro_stand
 # =========================================================
 plots_ogf <- dbReadTable(con, "dendro_plot") %>%
+  left_join(dendro_stand, by = id_communes) %>%
   filter(valid_mature == 1) %>%
   mutate(
     bm_sol_total = vol_wood_debris_FAS + vol_wood_debris_LIS
@@ -283,29 +328,29 @@ plots_ogf <- dbReadTable(con, "dendro_plot") %>%
 dbDisconnect(con)
 
 # =========================================================
-# 11) CONTROLES RAPIDES
+# 12) CONTROLES RAPIDES
 # =========================================================
 update_tbl %>% count(valid_mature, sort = TRUE)
 update_tbl %>% count(typologie_mature, sort = TRUE)
 update_tbl %>% count(typologie_mature_simplifiee, sort = TRUE)
 update_tbl %>% count(ess_max, sort = TRUE)
 
+summary(plots_ogf$nha_tgb)
 head(update_tbl)
+head(plots_ogf)
 
 # =========================================================
-# 12) ANALYSES BOIS MORT
+# 13) ANALYSES BOIS MORT
 # =========================================================
-
-se <- function(x) {
-  x <- x[!is.na(x)]
-  if (length(x) <= 1) return(NA_real_)
-  sd(x) / sqrt(length(x))
-}
 
 # --- Toutes les placettes
 indicateurs_ogf <- plots_ogf %>%
   summarise(
     n_plots = n(),
+    
+    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
+    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
+    nha_tgb_se  = se(nha_tgb),
     
     bm_total_moy = mean(vol_deadw, na.rm = TRUE),
     bm_total_med = median(vol_deadw, na.rm = TRUE),
@@ -338,6 +383,10 @@ indicateurs_ogf_no0 <- plots_ogf %>%
   summarise(
     n_plots = n(),
     
+    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
+    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
+    nha_tgb_se  = se(nha_tgb),
+    
     bm_total_moy = mean(vol_deadw, na.rm = TRUE),
     bm_total_med = median(vol_deadw, na.rm = TRUE),
     bm_total_se  = se(vol_deadw),
@@ -368,6 +417,10 @@ indicateurs_ogf_par_typologie_no0 <- plots_ogf %>%
   summarise(
     n_plots = n(),
     
+    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
+    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
+    nha_tgb_se  = se(nha_tgb),
+    
     bm_total_moy = mean(vol_deadw, na.rm = TRUE),
     bm_total_med = median(vol_deadw, na.rm = TRUE),
     bm_total_se  = se(vol_deadw),
@@ -395,13 +448,15 @@ indicateurs_ogf_par_typologie_no0 <- plots_ogf %>%
 indicateurs_ogf_par_typologie_no0
 
 # =========================================================
-# 13) TABLEAUX "SLIDE READY"
+# 14) TABLEAUX "SLIDE READY"
 # =========================================================
-
 tableau_ogf_slide <- indicateurs_ogf %>%
   transmute(
     zone = "OGF terrain",
     n = n_plots,
+    nha_tgb_moy = round(nha_tgb_moy, 1),
+    nha_tgb_med = round(nha_tgb_med, 1),
+    nha_tgb_se  = round(nha_tgb_se, 1),
     bm_total_moy = round(bm_total_moy, 1),
     mediane = round(bm_total_med, 1),
     se = round(bm_total_se, 1),
@@ -416,6 +471,9 @@ tableau_ogf_slide_no0 <- indicateurs_ogf_no0 %>%
   transmute(
     zone = "OGF terrain (BM > 0)",
     n = n_plots,
+    nha_tgb_moy = round(nha_tgb_moy, 1),
+    nha_tgb_med = round(nha_tgb_med, 1),
+    nha_tgb_se  = round(nha_tgb_se, 1),
     bm_total_moy = round(bm_total_moy, 1),
     mediane = round(bm_total_med, 1),
     se = round(bm_total_se, 1),
@@ -429,6 +487,9 @@ tableau_ogf_typo_slide <- indicateurs_ogf_par_typologie_no0 %>%
   transmute(
     typologie = typologie_mature_simplifiee,
     n = n_plots,
+    nha_tgb_moy = round(nha_tgb_moy, 1),
+    nha_tgb_med = round(nha_tgb_med, 1),
+    nha_tgb_se  = round(nha_tgb_se, 1),
     bm_total_moy = round(bm_total_moy, 1),
     mediane = round(bm_total_med, 1),
     se = round(bm_total_se, 1),
@@ -439,9 +500,8 @@ tableau_ogf_typo_slide <- indicateurs_ogf_par_typologie_no0 %>%
 tableau_ogf_typo_slide
 
 # =========================================================
-# 14) CORRELATION FAS vs LIS
+# 15) CORRELATION FAS vs LIS
 # =========================================================
-
 test_cor_fas_lis_pearson <- cor.test(
   plots_ogf$vol_wood_debris_FAS,
   plots_ogf$vol_wood_debris_LIS,
@@ -459,13 +519,9 @@ test_cor_fas_lis_spearman <- cor.test(
 test_cor_fas_lis_pearson
 test_cor_fas_lis_spearman
 
-
-
 # =========================================================
-# 12) DESCRIPTION DES DONNEES TERRAIN OGF
+# 16) DESCRIPTION DES DONNEES TERRAIN OGF
 # =========================================================
-
-# Sécurité : recalcul de quelques variables utiles
 plots_ogf <- plots_ogf %>%
   mutate(
     bm_sur_pied = vol_dead_standing,
@@ -477,9 +533,8 @@ plots_ogf <- plots_ogf %>%
   )
 
 # ---------------------------------------------------------
-# 12.1 Tableau général complet
+# 16.1 Tableau général complet
 # ---------------------------------------------------------
-
 description_ogf_globale <- plots_ogf %>%
   summarise(
     n_placettes = n(),
@@ -491,6 +546,10 @@ description_ogf_globale <- plots_ogf %>%
     CIR_max_moy = mean(CIR_max, na.rm = TRUE),
     CIR_max_med = median(CIR_max, na.rm = TRUE),
     CIR_max_se  = se(CIR_max),
+    
+    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
+    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
+    nha_tgb_se  = se(nha_tgb),
     
     vol_vivant_moy = mean(vol_alive, na.rm = TRUE),
     vol_vivant_med = median(vol_alive, na.rm = TRUE),
@@ -529,9 +588,8 @@ description_ogf_globale <- plots_ogf %>%
 description_ogf_globale
 
 # ---------------------------------------------------------
-# 12.2 Tableau par typologie
+# 16.2 Tableau par typologie
 # ---------------------------------------------------------
-
 description_ogf_par_typologie <- plots_ogf %>%
   group_by(typologie_mature_simplifiee) %>%
   summarise(
@@ -544,6 +602,10 @@ description_ogf_par_typologie <- plots_ogf %>%
     CIR_max_moy = mean(CIR_max, na.rm = TRUE),
     CIR_max_med = median(CIR_max, na.rm = TRUE),
     CIR_max_se  = se(CIR_max),
+    
+    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
+    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
+    nha_tgb_se  = se(nha_tgb),
     
     vol_vivant_moy = mean(vol_alive, na.rm = TRUE),
     vol_vivant_med = median(vol_alive, na.rm = TRUE),
@@ -582,9 +644,8 @@ description_ogf_par_typologie <- plots_ogf %>%
 description_ogf_par_typologie
 
 # ---------------------------------------------------------
-# 12.3 Version "slide-ready" : structure générale
+# 16.3 Version "slide-ready" : structure générale
 # ---------------------------------------------------------
-
 tableau_ogf_structure_slide <- description_ogf_globale %>%
   transmute(
     Jeu = "Placettes terrain OGF",
@@ -595,6 +656,10 @@ tableau_ogf_structure_slide <- description_ogf_globale %>%
     
     `CIR max moyen` = round(CIR_max_moy, 1),
     `CIR max médian` = round(CIR_max_med, 1),
+    
+    `NHA TGB moyen` = round(nha_tgb_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_med, 1),
+    `SE NHA TGB` = round(nha_tgb_se, 1),
     
     `Vol. vivant moyen` = round(vol_vivant_moy, 1),
     `SE vol. vivant` = round(vol_vivant_se, 1),
@@ -611,13 +676,15 @@ tableau_ogf_structure_slide <- description_ogf_globale %>%
 tableau_ogf_structure_slide
 
 # ---------------------------------------------------------
-# 12.4 Version "slide-ready" : décomposition du bois mort
+# 16.4 Version "slide-ready" : décomposition du bois mort
 # ---------------------------------------------------------
-
 tableau_ogf_bm_slide <- description_ogf_globale %>%
   transmute(
     Jeu = "Placettes terrain OGF",
     n = n_placettes,
+    
+    `NHA TGB moyen` = round(nha_tgb_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_med, 1),
     
     `BM total moyen` = round(vol_mort_moy, 1),
     `BM total médian` = round(vol_mort_med, 1),
@@ -639,9 +706,8 @@ tableau_ogf_bm_slide <- description_ogf_globale %>%
 tableau_ogf_bm_slide
 
 # ---------------------------------------------------------
-# 12.5 Version "slide-ready" : par typologie
+# 16.5 Version "slide-ready" : par typologie
 # ---------------------------------------------------------
-
 tableau_ogf_typologie_slide <- description_ogf_par_typologie %>%
   transmute(
     Typologie = typologie_mature_simplifiee,
@@ -649,6 +715,9 @@ tableau_ogf_typologie_slide <- description_ogf_par_typologie %>%
     
     `CDOM moy` = round(cdom_moy, 1),
     `CIR max moy` = round(CIR_max_moy, 1),
+    
+    `NHA TGB moy` = round(nha_tgb_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_med, 1),
     
     `Vol. vivant moy` = round(vol_vivant_moy, 1),
     `Vol. mort total moy` = round(vol_mort_moy, 1),
@@ -665,11 +734,8 @@ tableau_ogf_typologie_slide <- description_ogf_par_typologie %>%
 tableau_ogf_typologie_slide
 
 # ---------------------------------------------------------
-# 12.6 Export Excel séparé "description terrain"
+# 16.6 Export Excel séparé "description terrain"
 # ---------------------------------------------------------
-
-library(openxlsx)
-
 f_out_ogf_desc <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/resultats_description_terrain_ogf.xlsx"
 
 wb_ogf <- createWorkbook()
@@ -688,19 +754,17 @@ writeData(wb_ogf, "ogf_slide_typologie", tableau_ogf_typologie_slide)
 
 saveWorkbook(wb_ogf, f_out_ogf_desc, overwrite = TRUE)
 
-
-
-
-
-
 # ---------------------------------------------------------
-# 12.7 Tableau par typologie - toutes les placettes (sans filtre BM > 0)
+# 16.7 Tableau par typologie - toutes les placettes
 # ---------------------------------------------------------
-
 description_ogf_par_typologie_all <- plots_ogf %>%
   group_by(typologie_mature_simplifiee) %>%
   summarise(
     n_placettes = n(),
+    
+    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
+    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
+    nha_tgb_se  = se(nha_tgb),
     
     vol_mort_moy = mean(vol_deadw, na.rm = TRUE),
     vol_mort_med = median(vol_deadw, na.rm = TRUE),
@@ -728,15 +792,17 @@ description_ogf_par_typologie_all <- plots_ogf %>%
 
 description_ogf_par_typologie_all
 
-
 # ---------------------------------------------------------
 # Version lisible pour slides
 # ---------------------------------------------------------
-
 tableau_ogf_typologie_all_slide <- description_ogf_par_typologie_all %>%
   transmute(
     Typologie = typologie_mature_simplifiee,
     n = n_placettes,
+    
+    `NHA TGB moy` = round(nha_tgb_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_med, 1),
+    `SE NHA TGB` = round(nha_tgb_se, 1),
     
     `BM total moyen` = round(vol_mort_moy, 1),
     `BM total médian` = round(vol_mort_med, 1),
@@ -753,24 +819,3 @@ tableau_ogf_typologie_all_slide <- description_ogf_par_typologie_all %>%
   )
 
 tableau_ogf_typologie_all_slide
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
