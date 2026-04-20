@@ -131,9 +131,8 @@ se <- function(x) {
 # =========================================================
 con <- dbConnect(RSQLite::SQLite(), chemin_bd)
 
-dendro_plot_db  <- dbReadTable(con, "dendro_plot")
-arbre           <- dbReadTable(con, "arbre")
-dendro_stand_raw <- dbReadTable(con, "dendro_stand")
+dendro_plot_db <- dbReadTable(con, "dendro_plot")
+arbre          <- dbReadTable(con, "arbre")
 
 # clé utilisée pour toute la logique dendro_plot / arbre
 key <- c("ues_id_ogf", "ues_id_ue")
@@ -146,31 +145,9 @@ if (nrow(dup_key) > 0) {
   stop("dendro_plot contient des doublons sur (ues_id_ogf, ues_id_ue). Corrige avant update.")
 }
 
-# vérification présence nha_tgb dans dendro_stand
-if (!"nha_tgb" %in% names(dendro_stand_raw)) {
-  stop("La colonne nha_tgb n'existe pas dans dendro_stand.")
-}
-
-# détection automatique des colonnes ID communes entre dendro_plot et dendro_stand
-id_communes <- intersect(names(dendro_plot_db), names(dendro_stand_raw))
-id_communes <- id_communes[grepl("(^ues_id|^id_)", id_communes)]
-
-if (length(id_communes) == 0) {
-  stop("Aucune colonne ID commune détectée entre dendro_plot et dendro_stand.")
-}
-
-message("Colonnes utilisées pour la jointure dendro_plot <-> dendro_stand : ",
-        paste(id_communes, collapse = ", "))
-
-dendro_stand <- dendro_stand_raw %>%
-  select(all_of(id_communes), nha_tgb)
-
-dup_key_stand <- dendro_stand %>%
-  count(across(all_of(id_communes))) %>%
-  filter(n > 1)
-
-if (nrow(dup_key_stand) > 0) {
-  stop("dendro_stand contient des doublons sur les colonnes communes de jointure.")
+# vérification présence nha_tgb_240 dans dendro_plot
+if (!"nha_tgb_240" %in% names(dendro_plot_db)) {
+  stop("La colonne nha_tgb_240 n'existe pas dans dendro_plot.")
 }
 
 # =========================================================
@@ -316,10 +293,8 @@ dbExecute(con, "DROP TABLE tmp_update_mature;")
 
 # =========================================================
 # 11) RELECTURE TABLE MISE A JOUR POUR ANALYSES
-# + ajout de nha_tgb depuis dendro_stand
 # =========================================================
 plots_ogf <- dbReadTable(con, "dendro_plot") %>%
-  left_join(dendro_stand, by = id_communes) %>%
   filter(valid_mature == 1) %>%
   mutate(
     bm_sol_total = vol_wood_debris_FAS + vol_wood_debris_LIS
@@ -335,7 +310,9 @@ update_tbl %>% count(typologie_mature, sort = TRUE)
 update_tbl %>% count(typologie_mature_simplifiee, sort = TRUE)
 update_tbl %>% count(ess_max, sort = TRUE)
 
-summary(plots_ogf$nha_tgb)
+names(plots_ogf)[grepl("nha_tgb", names(plots_ogf))]
+summary(plots_ogf$nha_tgb_240)
+
 head(update_tbl)
 head(plots_ogf)
 
@@ -348,9 +325,9 @@ indicateurs_ogf <- plots_ogf %>%
   summarise(
     n_plots = n(),
     
-    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
-    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
-    nha_tgb_se  = se(nha_tgb),
+    nha_tgb_240_moy = mean(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_med = median(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_se  = se(nha_tgb_240),
     
     bm_total_moy = mean(vol_deadw, na.rm = TRUE),
     bm_total_med = median(vol_deadw, na.rm = TRUE),
@@ -383,9 +360,9 @@ indicateurs_ogf_no0 <- plots_ogf %>%
   summarise(
     n_plots = n(),
     
-    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
-    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
-    nha_tgb_se  = se(nha_tgb),
+    nha_tgb_240_moy = mean(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_med = median(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_se  = se(nha_tgb_240),
     
     bm_total_moy = mean(vol_deadw, na.rm = TRUE),
     bm_total_med = median(vol_deadw, na.rm = TRUE),
@@ -417,9 +394,9 @@ indicateurs_ogf_par_typologie_no0 <- plots_ogf %>%
   summarise(
     n_plots = n(),
     
-    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
-    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
-    nha_tgb_se  = se(nha_tgb),
+    nha_tgb_240_moy = mean(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_med = median(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_se  = se(nha_tgb_240),
     
     bm_total_moy = mean(vol_deadw, na.rm = TRUE),
     bm_total_med = median(vol_deadw, na.rm = TRUE),
@@ -446,7 +423,6 @@ indicateurs_ogf_par_typologie_no0 <- plots_ogf %>%
   arrange(desc(bm_total_moy))
 
 indicateurs_ogf_par_typologie_no0
-
 # =========================================================
 # 14) TABLEAUX "SLIDE READY"
 # =========================================================
@@ -454,9 +430,9 @@ tableau_ogf_slide <- indicateurs_ogf %>%
   transmute(
     zone = "OGF terrain",
     n = n_plots,
-    nha_tgb_moy = round(nha_tgb_moy, 1),
-    nha_tgb_med = round(nha_tgb_med, 1),
-    nha_tgb_se  = round(nha_tgb_se, 1),
+    nha_tgb_240_moy = round(nha_tgb_240_moy, 1),
+    nha_tgb_240_med = round(nha_tgb_240_med, 1),
+    nha_tgb_240_se  = round(nha_tgb_240_se, 1),
     bm_total_moy = round(bm_total_moy, 1),
     mediane = round(bm_total_med, 1),
     se = round(bm_total_se, 1),
@@ -471,9 +447,9 @@ tableau_ogf_slide_no0 <- indicateurs_ogf_no0 %>%
   transmute(
     zone = "OGF terrain (BM > 0)",
     n = n_plots,
-    nha_tgb_moy = round(nha_tgb_moy, 1),
-    nha_tgb_med = round(nha_tgb_med, 1),
-    nha_tgb_se  = round(nha_tgb_se, 1),
+    nha_tgb_240_moy = round(nha_tgb_240_moy, 1),
+    nha_tgb_240_med = round(nha_tgb_240_med, 1),
+    nha_tgb_240_se  = round(nha_tgb_240_se, 1),
     bm_total_moy = round(bm_total_moy, 1),
     mediane = round(bm_total_med, 1),
     se = round(bm_total_se, 1),
@@ -487,9 +463,9 @@ tableau_ogf_typo_slide <- indicateurs_ogf_par_typologie_no0 %>%
   transmute(
     typologie = typologie_mature_simplifiee,
     n = n_plots,
-    nha_tgb_moy = round(nha_tgb_moy, 1),
-    nha_tgb_med = round(nha_tgb_med, 1),
-    nha_tgb_se  = round(nha_tgb_se, 1),
+    nha_tgb_240_moy = round(nha_tgb_240_moy, 1),
+    nha_tgb_240_med = round(nha_tgb_240_med, 1),
+    nha_tgb_240_se  = round(nha_tgb_240_se, 1),
     bm_total_moy = round(bm_total_moy, 1),
     mediane = round(bm_total_med, 1),
     se = round(bm_total_se, 1),
@@ -547,9 +523,9 @@ description_ogf_globale <- plots_ogf %>%
     CIR_max_med = median(CIR_max, na.rm = TRUE),
     CIR_max_se  = se(CIR_max),
     
-    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
-    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
-    nha_tgb_se  = se(nha_tgb),
+    nha_tgb_240_moy = mean(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_med = median(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_se  = se(nha_tgb_240),
     
     vol_vivant_moy = mean(vol_alive, na.rm = TRUE),
     vol_vivant_med = median(vol_alive, na.rm = TRUE),
@@ -603,9 +579,9 @@ description_ogf_par_typologie <- plots_ogf %>%
     CIR_max_med = median(CIR_max, na.rm = TRUE),
     CIR_max_se  = se(CIR_max),
     
-    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
-    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
-    nha_tgb_se  = se(nha_tgb),
+    nha_tgb_240_moy = mean(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_med = median(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_se  = se(nha_tgb_240),
     
     vol_vivant_moy = mean(vol_alive, na.rm = TRUE),
     vol_vivant_med = median(vol_alive, na.rm = TRUE),
@@ -657,9 +633,9 @@ tableau_ogf_structure_slide <- description_ogf_globale %>%
     `CIR max moyen` = round(CIR_max_moy, 1),
     `CIR max médian` = round(CIR_max_med, 1),
     
-    `NHA TGB moyen` = round(nha_tgb_moy, 1),
-    `NHA TGB médian` = round(nha_tgb_med, 1),
-    `SE NHA TGB` = round(nha_tgb_se, 1),
+    `NHA TGB moyen` = round(nha_tgb_240_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_240_med, 1),
+    `SE NHA TGB` = round(nha_tgb_240_se, 1),
     
     `Vol. vivant moyen` = round(vol_vivant_moy, 1),
     `SE vol. vivant` = round(vol_vivant_se, 1),
@@ -683,8 +659,8 @@ tableau_ogf_bm_slide <- description_ogf_globale %>%
     Jeu = "Placettes terrain OGF",
     n = n_placettes,
     
-    `NHA TGB moyen` = round(nha_tgb_moy, 1),
-    `NHA TGB médian` = round(nha_tgb_med, 1),
+    `NHA TGB moyen` = round(nha_tgb_240_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_240_med, 1),
     
     `BM total moyen` = round(vol_mort_moy, 1),
     `BM total médian` = round(vol_mort_med, 1),
@@ -716,8 +692,8 @@ tableau_ogf_typologie_slide <- description_ogf_par_typologie %>%
     `CDOM moy` = round(cdom_moy, 1),
     `CIR max moy` = round(CIR_max_moy, 1),
     
-    `NHA TGB moy` = round(nha_tgb_moy, 1),
-    `NHA TGB médian` = round(nha_tgb_med, 1),
+    `NHA TGB moy` = round(nha_tgb_240_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_240_med, 1),
     
     `Vol. vivant moy` = round(vol_vivant_moy, 1),
     `Vol. mort total moy` = round(vol_mort_moy, 1),
@@ -762,9 +738,9 @@ description_ogf_par_typologie_all <- plots_ogf %>%
   summarise(
     n_placettes = n(),
     
-    nha_tgb_moy = mean(nha_tgb, na.rm = TRUE),
-    nha_tgb_med = median(nha_tgb, na.rm = TRUE),
-    nha_tgb_se  = se(nha_tgb),
+    nha_tgb_240_moy = mean(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_med = median(nha_tgb_240, na.rm = TRUE),
+    nha_tgb_240_se  = se(nha_tgb_240),
     
     vol_mort_moy = mean(vol_deadw, na.rm = TRUE),
     vol_mort_med = median(vol_deadw, na.rm = TRUE),
@@ -800,9 +776,9 @@ tableau_ogf_typologie_all_slide <- description_ogf_par_typologie_all %>%
     Typologie = typologie_mature_simplifiee,
     n = n_placettes,
     
-    `NHA TGB moy` = round(nha_tgb_moy, 1),
-    `NHA TGB médian` = round(nha_tgb_med, 1),
-    `SE NHA TGB` = round(nha_tgb_se, 1),
+    `NHA TGB moy` = round(nha_tgb_240_moy, 1),
+    `NHA TGB médian` = round(nha_tgb_240_med, 1),
+    `SE NHA TGB` = round(nha_tgb_240_se, 1),
     
     `BM total moyen` = round(vol_mort_moy, 1),
     `BM total médian` = round(vol_mort_med, 1),

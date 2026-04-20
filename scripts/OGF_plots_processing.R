@@ -13,6 +13,14 @@ basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 setwd(basedir)
 
+#léa
+
+#basedir <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest"
+#source(paste0(basedir,"/scripts/utils_OGF.R"))
+#db.path <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all.db"
+#db <- dbConnect(SQLite(), dbname = db.path)
+
+
 # script qui contient la ou les fonctions utilisées , ici le tarif de cubage.
 source(paste0(basedir,"/scripts/utils_OGF.R"))
 
@@ -26,16 +34,6 @@ path.entry.collect.list <- paste0("/home/jo/Documents/OGF/collect/collect-C-2026
 # quand on reçoit un nouvel encodage via le formulaire web, on l'ajoute à la bd OGF_all
 path.ogf.encodage.toadd <- "/home/jo/Documents/OGF/data/OGF20260108.db"
 
-db.path <- paste0(basedir,"/data/OGF_all.db")
-db <- dbConnect(SQLite(),dbname=db.path)
-
-# encodage via formulaire web
-if (file.exists(path.ogf.encodage.toadd)){
-  dbNewOGF <- dbConnect(SQLite(),dbname=path.ogf.encodage.toadd)
-  new.ogf<- dbReadTable(dbNewOGF ,"ogf")
-  dbDisconnect(dbNewOGF) 
-  dbWriteTable(db,"ogf",new.ogf, overwrite=T)
-}
 
 # check que tout les dictionnaires sont dans la BD. Si pas, je les ajoute
 for (dico.file in list.files(path.dico.tables)){
@@ -202,11 +200,29 @@ lLIS <- merge(dt_LIS,ues[,c(key_ue_cols2,"lLIS")],by.x=key_ue_cols, by.y=key_ue_
 dt_LIS$v <- 10000 * ((pi^2)/(8*(3*lLIS$lLIS)))*(dt_LIS$circ/(pi*100))^2
 
 # les noms des variables dendro se rapprochent autant que ce peux de celles utilisées par Vandekerkhove
-dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_thres120=sum(fe),vol_alive_thres120 = sum(v_tc1*fe), basal_area_alive_thres120=sum((circ/100)^2*fe/(4*pi)),nha_tgb_210=sum((circ>210)* fe))
-dendro_arbre_mort <- arbre[arbre$statut==2,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_dead_standing = sum((v)*fe), basal_area_dead=sum((circ/100)^2*fe/(4*pi)))
+dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% 
+  group_by(ues_id_ogf,ues_id_ue) %>% 
+  summarise(
+    number_of_trees_thres120 = sum(fe),
+    vol_alive_thres120 = sum(v_tc1*fe),
+    basal_area_alive_thres120 = sum((circ/100)^2*fe/(4*pi)),
+    nha_tgb_210 = sum((circ>210)*fe),
+    nha_tgb_240 = sum((circ>=240)*fe),
+    nha_tgb_cas2_150 = sum((circ>150)*fe),
+    nha_tgb_cas1_240 = sum((circ>=240)*fe)
+  )
+dendro_arbre_mort <- arbre[arbre$statut==2,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_dead_standing = sum((v)*fe), basal_area_dead=sum((circ/100)^2*fe/(4*pi)),nha_dead_standing_cas2_120=sum((circ>120)*fe),nha_dead_standing_cas1_180=sum((circ>180)*fe))
+
 dendro_cohorte <- cohorte %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_co=sum(nombre*feA3), vol_alive_co = sum(v*feA3), basal_area_alive_co=sum(nombre*(circ/100)^2*feA3/(4*pi)))
-dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4),nha_cwd_90_150=sum((max(circ1,circ2)>90 & max(circ1,circ2) <150) * feA4))
+
+dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4),
+                                                                      nha_cwd_90_150=sum((pmax(circ1,circ2)>90 & pmax(circ1,circ2)<=150) * feA4),
+                                                                      nha_cwd_sup150=sum((pmax(circ1,circ2)>150) * feA4),
+                                                                      nha_cwd_120_180=sum((pmax(circ1,circ2)>120 & pmax(circ1,circ2)<=180) * feA4),
+                                                                      nha_cwd_sup180=sum((pmax(circ1,circ2)>180) * feA4))
+
 dendro_LIS <- dt_LIS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_LIS = sum(v))
+
 
 #création matrice ogf x essence pour proportion de chaque essence dans l'UE
 e <- unique(arbre$ess)
@@ -290,13 +306,27 @@ dendro_cdom <- plots_trees_coppices %>% mutate(
 dendro <- merge(dendro,dendro_cdom,by.x=key_ue_cols , all=F)
 
 # réordonner les colonnes pour plus de logique et de lisibilité
-colOrder <- c("ues_id_ogf","ues_id_ue","essmaj","number_of_trees_co","number_of_trees_thres120","number_of_trees","basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead","vol_alive_co","vol_alive_thres120","vol_alive","vol_dead_standing","vol_dead_standing_ratio","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom", "nha_tgb_210")
+colOrder <- c("ues_id_ogf","ues_id_ue","essmaj",
+              "number_of_trees_co","number_of_trees_thres120","number_of_trees",
+              "basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead",
+              "vol_alive_co","vol_alive_thres120","vol_alive",
+              "vol_dead_standing","vol_dead_standing_ratio",
+              "vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw",
+              "cdom","nha_tgb_210" ,"nha_tgb_240",
+              "nha_tgb_cas2_150","nha_tgb_cas1_240",
+              "nha_dead_standing_cas2_120","nha_dead_standing_cas1_180",
+              "nha_cwd_90_150","nha_cwd_sup150",
+              "nha_cwd_120_180","nha_cwd_sup180")
 dendro <- dendro[,colOrder]
 # ajout mesure gha par relascope pour comparaison avec gha calculé
 dendro <- merge(dendro,ues[,c(key_ue_cols2,"gha_relascope")],by.x=key_ue_cols, by.y=key_ue_cols2 , all=F)
 
 # STAND LEVEL
-var <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw", "cdom")
+var <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw", "cdom","nha_tgb_210","nha_tgb_240",
+         "nha_tgb_cas2_150","nha_tgb_cas1_240",
+         "nha_dead_standing_cas2_120","nha_dead_standing_cas1_180",
+         "nha_cwd_90_150","nha_cwd_sup150",
+         "nha_cwd_120_180","nha_cwd_sup180")
 
 standard_error <- function(x) {
   sd(x)/sqrt(length(x))
@@ -391,4 +421,6 @@ p4 <- arbreByClassByOGF %>%
 png("/home/jo/Documents/OGF/out/structure.png", width = 7.75, height = 5.75, res = 300, units = "in")
 plot(p4)
 dev.off()
+
+
 
