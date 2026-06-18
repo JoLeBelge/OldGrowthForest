@@ -65,3 +65,12 @@ gdal raster calc -i "ogf=STATUS_MIX_q70_DLG.tif" -i "tgb=structure_nha_tgb.tif" 
 Ce n'est pas magique évidemment..
 
 
+distinction des stations fertiles versus peu fertiles , cas 1 versus cas 2, sur base du potentiel sylvicole (PS) et des Niveaux hydriques
+
+gdal raster calc -i "PS=/home/jo/Documents/carteApt/Out/CSderives20230807/prod_b.tif" -i "NH=/home/jo/Documents/Carto/FEEW2020/NH202408_BD72.tif.0.tif" --calc "(PS==1 || PS ==2) ? 2 : (NH==15 || NH==6) ? 2 : 1"  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o fertiliteStationOGF.tif
+
+
+
+
+
+
