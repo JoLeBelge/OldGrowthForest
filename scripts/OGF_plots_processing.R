@@ -15,10 +15,10 @@ setwd(basedir)
 
 #léa
 
-#basedir <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest"
-#source(paste0(basedir,"/scripts/utils_OGF.R"))
-#db.path <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all.db"
-#db <- dbConnect(SQLite(), dbname = db.path)
+basedir <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest"
+source(paste0(basedir,"/scripts/utils_OGF.R"))
+db.path <- "C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest/data/OGF_all.db"
+db <- dbConnect(SQLite(), dbname = db.path)
 
 
 # script qui contient la ou les fonctions utilisées , ici le tarif de cubage.
@@ -189,8 +189,9 @@ for (i in 1:nrow(cohorte)){
 #dt_FAS$v <- (pi*(dt_FAS$longueur)/12)*((dt_FAS$circ1/(100*pi))^2 +(dt_FAS$circ2/(100*pi))^2 +(dt_FAS$circ1/(100*pi))*(dt_FAS$circ2/(100*pi)))
 # Smalian’s formula for truncated cones
 dt_FAS$v <- (pi*(dt_FAS$longueur)/2)*((dt_FAS$circ1/(pi*200))^2 +(dt_FAS$circ2/(pi*200))^2)
-
+dt_FAS$circ_max <- pmax(dt_FAS$circ1, dt_FAS$circ2, na.rm = TRUE)
 # calcul du volume des arbres mort au sol LIS, Van Wagner 1968
+
 # en m3/m2 :  v <- pi^2/8*(Longeur) diameter^2
 key_ue_cols <- c("ues_id_ogf", "ues_id_ue")
 key_ue_cols2 <- c("id_ogf", "id_ue")
@@ -206,21 +207,59 @@ dendro_arbre_vivant <- arbre[arbre$statut==1,] %>%
     number_of_trees_thres120 = sum(fe),
     vol_alive_thres120 = sum(v_tc1*fe),
     basal_area_alive_thres120 = sum((circ/100)^2*fe/(4*pi)),
-    nha_tgb_210 = sum((circ>210)*fe),
-    nha_tgb_240 = sum((circ>=240)*fe),
-    nha_tgb_cas2_150 = sum((circ>150)*fe),
-    nha_tgb_cas1_240 = sum((circ>=240)*fe)
+    nha_tgb_210 = sum((circ >= 210) * fe),
+    nha_tgb_240 = sum((circ >= 240) * fe),
+    # cas 1 : GB = [180-240[, TGB = [240-+[
+    nha_gb_cas1_180_240 = sum((circ >= 180 & circ < 240) * fe),
+    nha_tgb_cas1_240 = sum((circ >= 240) * fe),
+    # cas 2 : GB = [90-150[, TGB = [150-+[
+    nha_gb_cas2_90_150 = sum((circ >= 90 & circ < 150) * fe),
+    nha_tgb_cas2_150 = sum((circ >= 150) * fe)
   )
-dendro_arbre_mort <- arbre[arbre$statut==2,] %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_dead_standing = sum((v)*fe), basal_area_dead=sum((circ/100)^2*fe/(4*pi)),nha_dead_standing_cas2_120=sum((circ>120)*fe),nha_dead_standing_cas1_180=sum((circ>180)*fe))
 
+dendro_arbre_mort <- arbre[arbre$statut==2,] %>% 
+  group_by(ues_id_ogf,ues_id_ue) %>% 
+  summarise(
+    # descriptif global
+    vol_dead_standing = sum(v * fe),
+    basal_area_dead = sum((circ/100)^2 * fe / (4*pi)),
+    
+    # cas 1 : moyen = [120-180[, gros = [180-+[
+    nha_dead_standing_m_case1 = sum((circ >= 120 & circ < 180) * fe),
+    vol_dead_standing_m_case1 = sum(v * (circ >= 120 & circ < 180) * fe),
+    
+    nha_dead_standing_g_case1 = sum((circ >= 180) * fe),
+    vol_dead_standing_g_case1 = sum(v * (circ >= 180) * fe),
+    
+    # cas 2 : moyen = [90-150[, gros = [150-+[
+    nha_dead_standing_m_case2 = sum((circ >= 90 & circ < 150) * fe),
+    vol_dead_standing_m_case2 = sum(v * (circ >= 90 & circ < 150) * fe),
+    
+    nha_dead_standing_g_case2 = sum((circ >= 150) * fe),
+    vol_dead_standing_g_case2 = sum(v * (circ >= 150) * fe)
+  )
 dendro_cohorte <- cohorte %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_co=sum(nombre*feA3), vol_alive_co = sum(v*feA3), basal_area_alive_co=sum(nombre*(circ/100)^2*feA3/(4*pi)))
 
-dendro_FAS <- dt_FAS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_FAS = sum(v*feA4),
-                                                                      nha_cwd_90_150=sum((pmax(circ1,circ2)>90 & pmax(circ1,circ2)<=150) * feA4),
-                                                                      nha_cwd_sup150=sum((pmax(circ1,circ2)>150) * feA4),
-                                                                      nha_cwd_120_180=sum((pmax(circ1,circ2)>120 & pmax(circ1,circ2)<=180) * feA4),
-                                                                      nha_cwd_sup180=sum((pmax(circ1,circ2)>180) * feA4))
-
+dendro_FAS <- dt_FAS %>% 
+  group_by(ues_id_ogf,ues_id_ue) %>% 
+  summarise(
+    # descriptif global
+    vol_wood_debris_FAS = sum(v * feA4),
+    
+    # cas 1 : moyen = [120-180[, gros = [180-+[
+    nha_cwd_m_case1 = sum((circ_max >= 120 & circ_max < 180) * feA4),
+    vol_cwd_m_case1 = sum(v * (circ_max >= 120 & circ_max < 180) * feA4),
+    
+    nha_cwd_g_case1 = sum((circ_max >= 180) * feA4),
+    vol_cwd_g_case1 = sum(v * (circ_max >= 180) * feA4),
+    
+    # cas 2 : moyen = [90-150[, gros = [150-+[
+    nha_cwd_m_case2 = sum((circ_max >= 90 & circ_max < 150) * feA4),
+    vol_cwd_m_case2 = sum(v * (circ_max >= 90 & circ_max < 150) * feA4),
+    
+    nha_cwd_g_case2 = sum((circ_max >= 150) * feA4),
+    vol_cwd_g_case2 = sum(v * (circ_max >= 150) * feA4)
+  )
 dendro_LIS <- dt_LIS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_LIS = sum(v))
 
 
@@ -285,6 +324,24 @@ dendro$vol_deadw <- dendro$vol_dead_standing + dendro$vol_wood_debris_FAS + dend
 dendro$basal_area_alive <- dendro$basal_area_alive_thres120 + dendro$basal_area_alive_co
 dendro$vol_dead_standing_ratio <- 100*dendro$vol_dead_standing/(dendro$vol_alive+dendro$vol_dead_standing)
 
+# BOIS MORT DEBOUT
+# cas 1
+dendro$standing_deadwood_case1_nha <- dendro$nha_dead_standing_m_case1 + dendro$nha_dead_standing_g_case1
+dendro$standing_deadwood_case1_vol <- dendro$vol_dead_standing_m_case1 + dendro$vol_dead_standing_g_case1
+
+# cas 2
+dendro$standing_deadwood_case2_nha <- dendro$nha_dead_standing_m_case2 + dendro$nha_dead_standing_g_case2
+dendro$standing_deadwood_case2_vol <- dendro$vol_dead_standing_m_case2 + dendro$vol_dead_standing_g_case2
+
+# BOIS MORT COUCHE
+# cas 1
+dendro$cwd_case1_nha <- dendro$nha_cwd_m_case1 + dendro$nha_cwd_g_case1
+dendro$cwd_case1_vol <- dendro$vol_cwd_m_case1 + dendro$vol_cwd_g_case1
+
+# cas 2
+dendro$cwd_case2_nha <- dendro$nha_cwd_m_case2 + dendro$nha_cwd_g_case2
+dendro$cwd_case2_vol <- dendro$vol_cwd_m_case2 + dendro$vol_cwd_g_case2
+
 # circonférence dominante: je prends les 10 plus gros arbres par hectare
 n_tree_cdom <- 10
 plots_trees_coppices <- arbre %>% filter(statut==1) %>% group_by(ues_id_ogf,ues_id_ue) %>% arrange(desc(circ), .by_group = T) %>% mutate(fexthacumsum = cumsum(fe))
@@ -307,32 +364,39 @@ dendro <- merge(dendro,dendro_cdom,by.x=key_ue_cols , all=F)
 
 # réordonner les colonnes pour plus de logique et de lisibilité
 colOrder <- c("ues_id_ogf","ues_id_ue","essmaj",
-              "number_of_trees_co","number_of_trees_thres120","number_of_trees",
-              "basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead",
-              "vol_alive_co","vol_alive_thres120","vol_alive",
-              "vol_dead_standing","vol_dead_standing_ratio",
-              "vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw",
-              "cdom","nha_tgb_210" ,"nha_tgb_240",
-              "nha_tgb_cas2_150","nha_tgb_cas1_240",
-              "nha_dead_standing_cas2_120","nha_dead_standing_cas1_180",
-              "nha_cwd_90_150","nha_cwd_sup150",
-              "nha_cwd_120_180","nha_cwd_sup180")
-dendro <- dendro[,colOrder]
+  "number_of_trees_co","number_of_trees_thres120","number_of_trees","basal_area_alive_thres120","basal_area_alive_co","basal_area_alive","basal_area_dead",
+  "vol_alive_co","vol_alive_thres120","vol_alive","vol_dead_standing","vol_dead_standing_ratio",
+  "vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom","nha_tgb_210","nha_tgb_240","nha_gb_cas1_180_240","nha_tgb_cas1_240",
+  "nha_gb_cas2_90_150","nha_tgb_cas2_150","nha_dead_standing_m_case1","vol_dead_standing_m_case1","nha_dead_standing_g_case1","vol_dead_standing_g_case1",
+  "standing_deadwood_case1_nha","standing_deadwood_case1_vol","nha_dead_standing_m_case2","vol_dead_standing_m_case2","nha_dead_standing_g_case2","vol_dead_standing_g_case2",
+  "standing_deadwood_case2_nha","standing_deadwood_case2_vol","nha_cwd_m_case1","vol_cwd_m_case1","nha_cwd_g_case1","vol_cwd_g_case1","cwd_case1_nha","cwd_case1_vol",
+  "nha_cwd_m_case2","vol_cwd_m_case2","nha_cwd_g_case2","vol_cwd_g_case2","cwd_case2_nha","cwd_case2_vol")
+
+dendro <- dendro[, colOrder[colOrder %in% names(dendro)]]
 # ajout mesure gha par relascope pour comparaison avec gha calculé
 dendro <- merge(dendro,ues[,c(key_ue_cols2,"gha_relascope")],by.x=key_ue_cols, by.y=key_ue_cols2 , all=F)
 
 # STAND LEVEL
-var <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw", "cdom","nha_tgb_210","nha_tgb_240",
-         "nha_tgb_cas2_150","nha_tgb_cas1_240",
-         "nha_dead_standing_cas2_120","nha_dead_standing_cas1_180",
-         "nha_cwd_90_150","nha_cwd_sup150",
-         "nha_cwd_120_180","nha_cwd_sup180")
+var_mean_se <- c("number_of_trees","basal_area_alive","basal_area_dead","vol_alive","vol_dead_standing","vol_wood_debris_FAS","vol_wood_debris_LIS","vol_deadw","cdom")
+var_mean_only <- c("nha_tgb_210","nha_tgb_240","nha_gb_cas1_180_240","nha_tgb_cas1_240","nha_gb_cas2_90_150","nha_tgb_cas2_150","nha_dead_standing_m_case1","vol_dead_standing_m_case1",
+"nha_dead_standing_g_case1","vol_dead_standing_g_case1","standing_deadwood_case1_nha","standing_deadwood_case1_vol","nha_dead_standing_m_case2","vol_dead_standing_m_case2",
+"nha_dead_standing_g_case2","vol_dead_standing_g_case2","standing_deadwood_case2_nha","standing_deadwood_case2_vol","nha_cwd_m_case1","vol_cwd_m_case1",
+"nha_cwd_g_case1","vol_cwd_g_case1","cwd_case1_nha","cwd_case1_vol", "nha_cwd_m_case2","vol_cwd_m_case2","nha_cwd_g_case2","vol_cwd_g_case2","cwd_case2_nha","cwd_case2_vol")
 
-standard_error <- function(x) {
-  sd(x)/sqrt(length(x))
-}
-dendro_stand <- dendro %>% group_by(ues_id_ogf) %>% summarise(across(any_of(var), list(mean = mean, standard_error= standard_error), .names = "{.col}_{.fn}"))
+standard_error <- function(x) {x <- x[!is.na(x)]
+  if (length(x) <= 1) return(NA_real_)
+  sd(x) / sqrt(length(x))}
 
+dendro_stand_se <- dendro %>%
+  group_by(ues_id_ogf) %>%
+  summarise(across(any_of(var_mean_se),list(mean = mean, standard_error = standard_error),
+           .names = "{.col}_{.fn}"))
+
+dendro_stand_mean <- dendro %>%
+  group_by(ues_id_ogf) %>%
+  summarise(across(any_of(var_mean_only),mean,.names = "{.col}_mean"))
+
+dendro_stand <- merge(dendro_stand_se, dendro_stand_mean, by = "ues_id_ogf", all = TRUE)
 # writing results in the database
 dbWriteTable(db,"arbre",arbre, overwrite=T)
 dbWriteTable(db,"bois_mort_transect",dt_LIS, overwrite=T)
@@ -341,6 +405,7 @@ dbWriteTable(db,"dendro_plot",dendro, overwrite=T)
 dbWriteTable(db,"dendro_stand",dendro_stand, overwrite=T)
 dbDisconnect(db) 
 rm(db)
+
 
 # data flandre
 plot <- read.csv2("/home/jo/Documents/OGF/FLANDERS_stat_per_UE/plotinfo.csv")
