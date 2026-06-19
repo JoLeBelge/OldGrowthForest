@@ -8,10 +8,10 @@ require("purrr")
 require("magrittr")
 require("ggplot2")
 
-basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
+#basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
 # Léa: ici tu change la ligne et tu met ton répertoire à toi
-basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
-setwd(basedir)
+#basedir <- "/home/jo/Documents/OGF/OGF_Wallonia_forest_plots"
+#setwd(basedir)
 
 #léa
 
@@ -200,6 +200,50 @@ lLIS <- merge(dt_LIS,ues[,c(key_ue_cols2,"lLIS")],by.x=key_ue_cols, by.y=key_ue_
 # dans metadata de vandeKerkhove -> volume of lying deadwood per ha (m³/ha);  small fragments excluded (diameter < 10 cm or length < 1m; if diameter > 20 cm, length < 0,5m)
 dt_LIS$v <- 10000 * ((pi^2)/(8*(3*lLIS$lLIS)))*(dt_LIS$circ/(pi*100))^2
 
+
+# ------------------------------------------------------------
+# INDICATEURS BOIS MORT POUR LES SEUILS
+# On ne filtre pas les tables sources : arbre, dt_FAS, dt_LIS restent intactes
+# On crée seulement des copies temporaires pour les calculs
+# ------------------------------------------------------------
+
+seuil_circ_bm_case1 <- 125
+seuil_longueur_bm <- 2
+
+arbre_ind <- arbre %>%
+  mutate(
+    bm_hauteur_ok = is.na(h) | h >= seuil_longueur_bm,
+    
+    bm_standing_m_case1_ok = statut == 2 & !is.na(circ) &
+      circ >= seuil_circ_bm_case1 & circ < 180 & bm_hauteur_ok,
+    
+    bm_standing_g_case1_ok = statut == 2 & !is.na(circ) &
+      circ >= 180 & bm_hauteur_ok,
+    
+    bm_standing_m_case2_ok = statut == 2 & !is.na(circ) &
+      circ >= 90 & circ < 150 & bm_hauteur_ok,
+    
+    bm_standing_g_case2_ok = statut == 2 & !is.na(circ) &
+      circ >= 150 & bm_hauteur_ok
+  )
+
+dt_FAS_ind <- dt_FAS %>%
+  mutate(
+    bm_longueur_ok = !is.na(longueur) & longueur >= seuil_longueur_bm,
+    
+    bm_cwd_m_case1_ok = !is.na(circ_max) &
+      circ_max >= seuil_circ_bm_case1 & circ_max < 180 & bm_longueur_ok,
+    
+    bm_cwd_g_case1_ok = !is.na(circ_max) &
+      circ_max >= 180 & bm_longueur_ok,
+    
+    bm_cwd_m_case2_ok = !is.na(circ_max) &
+      circ_max >= 90 & circ_max < 150 & bm_longueur_ok,
+    
+    bm_cwd_g_case2_ok = !is.na(circ_max) &
+      circ_max >= 150 & bm_longueur_ok
+  )
+
 # les noms des variables dendro se rapprochent autant que ce peux de celles utilisées par Vandekerkhove
 dendro_arbre_vivant <- arbre[arbre$statut==1,] %>% 
   group_by(ues_id_ogf,ues_id_ue) %>% 
@@ -217,48 +261,54 @@ dendro_arbre_vivant <- arbre[arbre$statut==1,] %>%
     nha_tgb_cas2_150 = sum((circ >= 150) * fe)
   )
 
-dendro_arbre_mort <- arbre[arbre$statut==2,] %>% 
+dendro_arbre_mort <- arbre_ind %>% 
+  filter(statut == 2) %>%
   group_by(ues_id_ogf,ues_id_ue) %>% 
   summarise(
-    # descriptif global
-    vol_dead_standing = sum(v * fe),
-    basal_area_dead = sum((circ/100)^2 * fe / (4*pi)),
+    # descriptif global : inchangé, tous les bois morts debout
+    vol_dead_standing = sum(v * fe, na.rm = TRUE),
+    basal_area_dead = sum((circ/100)^2 * fe / (4*pi), na.rm = TRUE),
     
-    # cas 1 : moyen = [120-180[, gros = [180-+[
-    nha_dead_standing_m_case1 = sum((circ >= 120 & circ < 180) * fe),
-    vol_dead_standing_m_case1 = sum(v * (circ >= 120 & circ < 180) * fe),
+    # cas 1 : moyen = [125-180[, gros = [180-+[
+    # uniquement hauteur >= 2 m quand h est renseignée
+    nha_dead_standing_m_case1 = sum(bm_standing_m_case1_ok * fe, na.rm = TRUE),
+    vol_dead_standing_m_case1 = sum(v * bm_standing_m_case1_ok * fe, na.rm = TRUE),
     
-    nha_dead_standing_g_case1 = sum((circ >= 180) * fe),
-    vol_dead_standing_g_case1 = sum(v * (circ >= 180) * fe),
+    nha_dead_standing_g_case1 = sum(bm_standing_g_case1_ok * fe, na.rm = TRUE),
+    vol_dead_standing_g_case1 = sum(v * bm_standing_g_case1_ok * fe, na.rm = TRUE),
     
     # cas 2 : moyen = [90-150[, gros = [150-+[
-    nha_dead_standing_m_case2 = sum((circ >= 90 & circ < 150) * fe),
-    vol_dead_standing_m_case2 = sum(v * (circ >= 90 & circ < 150) * fe),
+    # mêmes seuils qu'avant, mais uniquement hauteur >= 2 m
+    nha_dead_standing_m_case2 = sum(bm_standing_m_case2_ok * fe, na.rm = TRUE),
+    vol_dead_standing_m_case2 = sum(v * bm_standing_m_case2_ok * fe, na.rm = TRUE),
     
-    nha_dead_standing_g_case2 = sum((circ >= 150) * fe),
-    vol_dead_standing_g_case2 = sum(v * (circ >= 150) * fe)
+    nha_dead_standing_g_case2 = sum(bm_standing_g_case2_ok * fe, na.rm = TRUE),
+    vol_dead_standing_g_case2 = sum(v * bm_standing_g_case2_ok * fe, na.rm = TRUE)
   )
 dendro_cohorte <- cohorte %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(number_of_trees_co=sum(nombre*feA3), vol_alive_co = sum(v*feA3), basal_area_alive_co=sum(nombre*(circ/100)^2*feA3/(4*pi)))
 
-dendro_FAS <- dt_FAS %>% 
+
+dendro_FAS <- dt_FAS_ind %>% 
   group_by(ues_id_ogf,ues_id_ue) %>% 
   summarise(
-    # descriptif global
-    vol_wood_debris_FAS = sum(v * feA4),
+    # descriptif global : inchangé, tout le bois mort FAS
+    vol_wood_debris_FAS = sum(v * feA4, na.rm = TRUE),
     
-    # cas 1 : moyen = [120-180[, gros = [180-+[
-    nha_cwd_m_case1 = sum((circ_max >= 120 & circ_max < 180) * feA4),
-    vol_cwd_m_case1 = sum(v * (circ_max >= 120 & circ_max < 180) * feA4),
+    # cas 1 : moyen = [125-180[, gros = [180-+[
+    # uniquement longueur >= 2 m
+    nha_cwd_m_case1 = sum(bm_cwd_m_case1_ok * feA4, na.rm = TRUE),
+    vol_cwd_m_case1 = sum(v * bm_cwd_m_case1_ok * feA4, na.rm = TRUE),
     
-    nha_cwd_g_case1 = sum((circ_max >= 180) * feA4),
-    vol_cwd_g_case1 = sum(v * (circ_max >= 180) * feA4),
+    nha_cwd_g_case1 = sum(bm_cwd_g_case1_ok * feA4, na.rm = TRUE),
+    vol_cwd_g_case1 = sum(v * bm_cwd_g_case1_ok * feA4, na.rm = TRUE),
     
     # cas 2 : moyen = [90-150[, gros = [150-+[
-    nha_cwd_m_case2 = sum((circ_max >= 90 & circ_max < 150) * feA4),
-    vol_cwd_m_case2 = sum(v * (circ_max >= 90 & circ_max < 150) * feA4),
+    # mêmes seuils qu'avant, mais uniquement longueur >= 2 m
+    nha_cwd_m_case2 = sum(bm_cwd_m_case2_ok * feA4, na.rm = TRUE),
+    vol_cwd_m_case2 = sum(v * bm_cwd_m_case2_ok * feA4, na.rm = TRUE),
     
-    nha_cwd_g_case2 = sum((circ_max >= 150) * feA4),
-    vol_cwd_g_case2 = sum(v * (circ_max >= 150) * feA4)
+    nha_cwd_g_case2 = sum(bm_cwd_g_case2_ok * feA4, na.rm = TRUE),
+    vol_cwd_g_case2 = sum(v * bm_cwd_g_case2_ok * feA4, na.rm = TRUE)
   )
 dendro_LIS <- dt_LIS %>% group_by(ues_id_ogf,ues_id_ue) %>% summarise(vol_wood_debris_LIS = sum(v))
 
@@ -403,8 +453,11 @@ dbWriteTable(db,"bois_mort_transect",dt_LIS, overwrite=T)
 dbWriteTable(db,"bois_mort_placette",dt_FAS, overwrite=T)
 dbWriteTable(db,"dendro_plot",dendro, overwrite=T)
 dbWriteTable(db,"dendro_stand",dendro_stand, overwrite=T)
+dbWriteTable(db,"dendro_plot_bm_2m",dendro, overwrite=T)
+dbWriteTable(db,"dendro_stand_bm_2m",dendro_stand, overwrite=T)
 dbDisconnect(db) 
 rm(db)
+
 
 
 # data flandre
