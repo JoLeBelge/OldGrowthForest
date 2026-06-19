@@ -1,13 +1,12 @@
-setwd("/home/jo/Documents/OGF/fromLeaProtocoleOpe/surveyOperationnel")
+setwd("/home/lisein/grf/OldGrowthForest/")
 
 require(dplyr)
 require(tibble)
 
-d <- read.csv2("ogf_terrain_ope.csv")
+d <- read.csv2("data/operational_survey/ogf_terrain_ope.csv")
 d$surf <- as.numeric(d$surf)
 
 # une ligne pour la moyenne par peuplement
-#d <- d %>% add_row(tibble_row(MAT_nGB = mean(d$MAT_nGB),MAT_nMB = mean(d$MAT_nMB),Bmd_nG = mean(d$Bmd_nG), Bmd_nM = mean(d$Bmd_nM),Bms_nG = mean(d$Bms_nG),Bms_nM = mean(d$Bms_nM)))
 vars <- c("MAT_nGB","MAT_nMB", "Bmd_nG", "Bmd_nM", "Bms_nG", "Bms_nM")
 d[!is.na(d$surf),colnames(d) %in% vars] <- d[!is.na(d$surf),colnames(d) %in% vars] / (3*d$surf[!is.na(d$surf)])
 
@@ -44,8 +43,9 @@ d$sBM <- d$sBMd+d$sBMs
 
 # ready for the OGF key
 
-d$OGF[d$sMAT < 2 & d$sBM <2] <- "NON OGF"
-d$OGF[d$sMAT ==2  & d$sBM ==2 ] <- "OGF en installation" #& d$sBM <=3
-d$OGF[d$sMAT >= 3 & d$sBM >=3] <- "OGF mature"
+d$OGF[d$sMAT < 3 & d$sBM <2] <- "NON OGF"
+d$OGF[d$sMAT >=3  & d$sBM ==2 ] <- "OGF optimal" #& d$sBM <=3
+d$OGF[d$sMAT >= 3 & d$sBM >=3] <- "OGF sénécence"
 
-write.csv2(d,"ogf_inv_ope_cleOGFresult.csv")
+# pour Léa: attention, je n'écrit pas les réslultats dans le dépot github => généralement les résultats intermédiaires de ce type ne sont pas sur le dépot ajouter le fichier à gitignore par exemple
+write.csv2(d,"tmp/ogf_inv_ope_cleOGFresult.csv")
