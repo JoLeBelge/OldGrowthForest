@@ -69,6 +69,43 @@ distinction des stations fertiles versus peu fertiles , cas 1 versus cas 2, sur 
 
 gdal raster calc -i "PS=/home/jo/Documents/carteApt/Out/CSderives20230807/prod_b.tif" -i "NH=/home/jo/Documents/Carto/FEEW2020/NH202408_BD72.tif.0.tif" --calc "(PS==1 || PS ==2) ? 2 : (NH==15 || NH==6) ? 2 : 1"  --overwrite --progress  --ot Byte --co "COMPRESS=DEFLATE" -o fertiliteStationOGF.tif
 
+# utilisation des polygones "ecotones" de 2022 téléchargé depuis LifeWatch pour le passage à l'échelle de la pré-carto OGF.
+tout d'abord, changer les raster STATUS dans R car les valeurs pour les pixels hors percentile Q90 ou Q70 sont notées avec la Digital Number 2 -> je les mets à 0.
+require(terra)
+setwd("/home/jo/Documents/OGF/out")
+r <-rast("STATUS_MIX_q90_DLG.tif")
+rcl_exact <- matrix(c(1, 1,2,0) ,ncol=2, byrow=TRUE)
+# Reclassify and turn unlisted values to NA
+rc_exact <- classify(r, rcl_exact, others=NA)
+writeRaster(rc_exact,"OGF_Q90.tif")
+
+Préselection des polygones ecotopes pour rendre la suite des calculs plus rapide : je ne garde que les forêts feuillues
+gdal vector filter ecotopes2022_v620.gpkg --where "BroadLV > 500" ecotopes2022_FE.gpkg
+-> polygon trop grands
+
+cette version est plus segmentée, ça me convient bien. C'est Julien Radoux qui m'as redirigé vers cette version, et il semble que la carte de WalNat-1 soit également réalisée avec ces polygones de base.
+gdal vector filter ecotopes2022_v419.gpkg --where "BroadLV > 500" ecotopes2022_v419_FE.gpkg
+
+Sélection des ecotope qui sont dans le masque forêt ancienne que nous avons défini (FA_DLG)
+
+gdal vector filter FA_20190920.gpkg --where "(D_L_G < 6 OR UR<5) AND resin!=2" FA_OGF.gpkg
+-> select by intersection ecotopes x FA_OGF sous Qgis.
+
+zonal statistique avec stationDescriptor pour OGF_Q90, OGF_Q70 et masque FA_FE (Forêt Ancienne feuillues) -> nombre de pixels
+puis création des champs prop_q90,prop_q70, prop_FA_FE et Classe Qgis.
+Champs "Classe"
+
+CASE 
+  WHEN "prop_FA_FE" > 66 AND ("prop_q90" > 10 AND "prop_q70" > 50) THEN 1
+  WHEN "prop_FA_FE" > 66 AND ("prop_q70" > 60) THEN 2
+  ELSE 0
+END
+
+
+
+
+
+
 
 
 
