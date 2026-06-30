@@ -1,5 +1,5 @@
-setwd("/home/lisein/grf/OldGrowthForest/")
-
+#setwd("/home/lisein/grf/OldGrowthForest/")
+setwd("C:/Users/Lemans Léa/Documents/GitHub/OldGrowthForest")
 require(dplyr)
 require(tibble)
 
@@ -44,8 +44,8 @@ d$sBM <- d$sBMd+d$sBMs
 # ready for the OGF key
 
 d$OGF[d$sMAT < 3 & d$sBM <2] <- "NON OGF"
-d$OGF[d$sMAT >=3  & d$sBM ==2 ] <- "OGF optimal" #& d$sBM <=3
-d$OGF[d$sMAT >= 3 & d$sBM >=3] <- "OGF sénécence"
+d$OGF[d$sMAT >=3  & d$sBM %in% c(2, 3) ] <- "OGF optimal" #& d$sBM <=3
+d$OGF[d$sMAT >= 3 & d$sBM >=4] <- "OGF sénécence"
 
 # pour Léa: attention, je n'écrit pas les réslultats dans le dépot github => généralement les résultats intermédiaires de ce type ne sont pas sur le dépot ajouter le fichier à gitignore par exemple
-write.csv2(d,"tmp/ogf_inv_ope_cleOGFresult.csv")
+write.xlsx(d,"C:/Users/Lemans Léa/Documents/GitHub/phase_2.xlsx")
