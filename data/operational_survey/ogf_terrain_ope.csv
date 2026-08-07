@@ -1,36 +1,49 @@
 id_ogf;surf;id_ue;type_peup;operateur;date;rmq;CAS;IND;STRUCT;MAT_nGB;MAT_nMB;Bmd_nG;Bmd_nM;Bms_nG;Bms_nM
-Marche Les Dames;;1;Hetraie chenaie;LL-JL;17/06/2026;;1;100;5;2;14;1;2;0;3
-Marche Les Dames;;2;Chenaie hetraie;LL-JL;17/06/2026;pas dans le peuplement. TSF;1;100;6;0;1;0;0;1;0
-Marche Les Dames;;3;Hetraie chenaie;LL-JL;17/06/2026;;1;100;5;1;7;0;5;3;6
-Marche Les Dames;;4;Chenaie hetraie;LL-JL;17/06/2026;sur des dolines en haut de pente;1;100;5;4;9;1;0;2;1
-Marche Les Dames;;5;Hetraie chenaie;LL-JL;17/06/2026;;1;100;4;14;13;1;0;0;0
-Marche Les Dames;;6;Hetraie chenaie;LL-JL;17/06/2026;encore une fois placette entre plateau et versant;1;100;4;5;10;2;0;0;3
-Marche Les Dames;;7;Hetraie chenaie;LL-JL;17/06/2026;;1;100;5;7;0;2;0;1;2
-Marche Les Dames;;8;Hetraie chenaie;LL-JL;17/06/2026;;1;100;6;3;11;0;0;0;1
-Marche Les Dames;;9;Hetraie erable champetre;LL-JL;17/06/2026;;1;100;5;1;5;0;0;1;2
-Marche Les Dames;;10;Chenaie frˆnaie;LL-JL;17/06/2026;frene et charme de 100 de tour en abondance;1;100;4;1;15;0;0;0;2
-Marche Les Dames;;11;Chenaie  (frene+charme);LL-JL;17/06/2026;;1;100;6;4;14;0;1;0;0
-Marche Les Dames;;12;chenaie ;LL-JL;17/06/2026;semis de che en plage cons‚quente. Traces d'exploitation;1;100;5;6;12;0;0;2;4
-Marche Les Dames;;13;chenaie ;LL-JL;17/06/2026;traces exploitation;1;100;6;8;11;0;0;0;4
-Marche Les Dames;;14;hetraie ;LL-JL;17/06/2026;bas de versant;1;100;5;8;7;1;1;3;2
-Marche Les Dames;;15;Hetraie-chenaie;LL-JL;17/06/2026;;1;100;5;3;21;1;0;2;1
-Marche Les Dames;;16;hetraie ;LL-JL;17/06/2026;forte pente - visibilit‚ mauvaise - TGB frene qui va bient“t mourir et tomber;1;100;5;4;6;1;0;2;4
-Grand-Leez;;1;chenaie ;LL-JL;02/06/26;;1;90;4;3;8;1;1;1;1
-Grand-Leez;;2;chenaie ;LL-JL;02/06/26;;1;95;4;8;2;0;0;0;0
-Grand-Leez;;3;chenaie ;LL-JL;02/06/26;;1;100;4;5;5;1;1;1;1
-Grand-Leez;;4;chenaie ;LL-JL;02/06/26;;1;100;6;9;8;1;0;2;1
-Grand-Leez;;5;peuplier;LL-JL;02/06/26;peupliers nombreux + chene + frene;1;100;6;15;6;0;0;2;0
-Daverdisse;2.9;1;Forêt alluviale aulnaie;LL;15/05/26;en plein;2;90;3;47;0;3;0;12;0
-Waulsort;;1;Erablière ravin;LL-JL;09/06/26;;2;100;3;4;10;1;0;0;2
-Waulsort;;2;Chenaie charmaie;LL-JL;10/06/26;;2;100;5;8;29;0;0;0;2
-Waulsort;;3;Erablière ravin Chenaie;LL-JL;11/06/26;;2;100;5;8;12;0;1;1;7
-Waulsort;;4;Erablière ravin Chenaie;LL-JL;12/06/26;presence d’un sentier;2;85;4;12;30;0;0;0;3
-Waulsort;;5;chenaie ;LL-JL;13/06/26;;2;100;5;15;15;0;1;0;0
-Waulsort;;6;Erablière ravin Chenaie;LL-JL;14/06/26;;2;100;3;11;9;0;1;0;5
-Waulsort;;7;fond de érabliere de ravin;LL-JL;15/06/26;dans la cascade : frene mot en bas de pente. Présence d’épicéa;2;85;4;7;20;0;0;8;16
-Waulsort;;8;/;LL-JL;16/06/26;;2;100;3;8;14;0;0;0;1
-Waulsort;;9;Chenaie charmaie;LL-JL;17/06/26;;2;100;5;2;17;1;0;0;4
-Waulsort;;10;Erablière Tilleul;LL-JL;18/06/26;pente très forte. Bcps de tilleuls;2;100;3;1;24;0;2;1;7
-Waulsort;;11;Erablière ;LL-JL;19/06/26;forte pente ;2;100;3;6;30;0;0;1;10
-Waulsort;;12;Erablière ;LL-JL;20/06/26;bas de versant;2;100;6;12;3;0;0;6;9
-Waulsort;;13;Erablière ;LL-JL;21/06/26;;2;100;3;5;10;0;1;6;11
+Marche Les Dames;;1;Hetraie chenaie;LL-JL;17-06-26;;1;100;5;2;14;1;2;0;3
+Marche Les Dames;;2;Chenaie hetraie;LL-JL;17-06-26;pas dans le peuplement. TSF;1;100;6;0;1;0;0;1;0
+Marche Les Dames;;3;Hetraie chenaie;LL-JL;17-06-26;;1;100;5;1;7;0;5;3;6
+Marche Les Dames;;4;Chenaie hetraie;LL-JL;17-06-26;sur des dolines en haut de pente;1;100;5;4;9;1;0;2;1
+Marche Les Dames;;5;Hetraie chenaie;LL-JL;17-06-26;;1;100;4;14;13;1;0;0;0
+Marche Les Dames;;6;Hetraie chenaie;LL-JL;17-06-26;encore une fois placette entre plateau et versant;1;100;4;5;10;2;0;0;3
+Marche Les Dames;;7;Hetraie chenaie;LL-JL;17-06-26;;1;100;5;7;0;2;0;1;2
+Marche Les Dames;;8;Hetraie chenaie;LL-JL;17-06-26;;1;100;6;3;11;0;0;0;1
+Marche Les Dames;;9;Hetraie erable champetre;LL-JL;17-06-26;;1;100;5;1;5;0;0;1;2
+Marche Les Dames;;10;Chenaie frˆnaie;LL-JL;17-06-26;frene et charme de 100 de tour en abondance;1;100;4;1;15;0;0;0;2
+Marche Les Dames;;11;Chenaie  (frene+charme);LL-JL;17-06-26;;1;100;6;4;14;0;1;0;0
+Marche Les Dames;;12;chenaie ;LL-JL;17-06-26;semis de che en plage cons‚quente. Traces d'exploitation;1;100;5;6;12;0;0;2;4
+Marche Les Dames;;13;chenaie ;LL-JL;17-06-26;traces exploitation;1;100;6;8;11;0;0;0;4
+Marche Les Dames;;14;hetraie ;LL-JL;17-06-26;bas de versant;1;100;5;8;7;1;1;3;2
+Marche Les Dames;;15;Hetraie-chenaie;LL-JL;17-06-26;;1;100;5;3;21;1;0;2;1
+Marche Les Dames;;16;hetraie ;LL-JL;17-06-26;forte pente - visibilit‚ mauvaise - TGB frene qui va bient“t mourir et tomber;1;100;5;4;6;1;0;2;4
+Grand-Leez;;1;chenaie ;LL-JL;02-06-26;;1;90;4;3;8;1;1;1;1
+Grand-Leez;;2;chenaie ;LL-JL;02-06-26;;1;95;4;8;2;0;0;0;0
+Grand-Leez;;3;chenaie ;LL-JL;02-06-26;;1;100;4;5;5;1;1;1;1
+Grand-Leez;;4;chenaie ;LL-JL;02-06-26;;1;100;6;9;8;1;0;2;1
+Grand-Leez;;5;peuplier;LL-JL;02-06-26;peupliers nombreux + chene + frene;1;100;6;15;6;0;0;2;0
+Daverdisse;2.9;1;Forêt alluviale aulnaie;LL;15-05-26;en plein;2;90;3;47;0;3;0;12;0
+Waulsort;;1;Erablière ravin;LL-JL;09-06-26;;2;100;3;4;10;1;0;0;2
+Waulsort;;2;Chenaie charmaie;LL-JL;10-06-26;;2;100;5;8;29;0;0;0;2
+Waulsort;;3;Erablière ravin Chenaie;LL-JL;11-06-26;;2;100;5;8;12;0;1;1;7
+Waulsort;;4;Erablière ravin Chenaie;LL-JL;12-06-26;presence d’un sentier;2;85;4;12;30;0;0;0;3
+Waulsort;;5;chenaie ;LL-JL;13-06-26;;2;100;5;15;15;0;1;0;0
+Waulsort;;6;Erablière ravin Chenaie;LL-JL;14-06-26;;2;100;3;11;9;0;1;0;5
+Waulsort;;7;fond de érabliere de ravin;LL-JL;15-06-26;dans la cascade : frene mot en bas de pente. Présence d’épicéa;2;85;4;7;20;0;0;8;16
+Waulsort;;8;/;LL-JL;16-06-26;;2;100;3;8;14;0;0;0;1
+Waulsort;;9;Chenaie charmaie;LL-JL;17-06-26;;2;100;5;2;17;1;0;0;4
+Waulsort;;10;Erablière Tilleul;LL-JL;18-06-26;pente très forte. Bcps de tilleuls;2;100;3;1;24;0;2;1;7
+Waulsort;;11;Erablière ;LL-JL;19-06-26;forte pente ;2;100;3;6;30;0;0;1;10
+Waulsort;;12;Erablière ;LL-JL;20-06-26;bas de versant;2;100;6;12;3;0;0;6;9
+Waulsort;;13;Erablière ;LL-JL;21-06-26;;2;100;3;5;10;0;1;6;11
+Sainte cecile;;1;Hetraie chenaie;LL-NB;06-08-26;;1;100;6;2;4;0;2;0;2
+Sainte cecile;;2;Hetraie chenaie;LL-NB;06-08-26;;1;100;5;0;2;1;0;0;0
+Sainte cecile;;3;Hetraie chenaie;LL-NB;06-08-26;;1;100;6;2;4;0;1;0;0
+Sainte cecile;;5;Hetraie chenaie;LL-NB;06-08-26;;1;98;4;2;6;0;1;0;0
+Sainte cecile;;6;Hetraie chenaie;LL-NB;06-08-26;;1;100;4;1;2;0;0;0;3
+Sainte cecile;;7;Hetraie chenaie;LL-NB;06-08-26;;1;100;4;3;4;0;0;0;0
+Sainte cecile;;8;Hetraie chenaie;LL-NB;06-08-26;epicea uniquement en régé basse;1;98;5;3;4;2;0;1;0
+Sainte cecile;;9;Hetraie chenaie;LL-NB;06-08-26;;1;100;4;1;5;0;1;0;1
+Sainte cecile;;10;Hetraie chenaie;LL-NB;06-08-26;grosse trouée sur 80% de la placette et 2 epiceas de +/- 150  de tour, épicéas en bordure extérieure;1;85;3;1;1;2;0;2;1
+Sainte cecile;;11;Hetraie chenaie;LL-NB;06-08-26;;1;100;5;5;2;0;1;1;0
+Sainte cecile;;12;Hetraie chenaie;LL-NB;06-08-26;;1;90;3;1;2;0;0;0;0
+Sainte cecile;;13;Hetraie chenaie;LL-NB;06-08-26;15% en trouée, 2 peches epiceas ;1;98;4;2;3;0;1;0;0
+Sainte cecile;;14;Hetraie chenaie;LL-NB;06-08-26;;1;80;4;2;4;1;0;0;0
